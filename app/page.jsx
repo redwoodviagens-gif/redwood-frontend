@@ -68,23 +68,26 @@ export default function Home() {
   }
 
   function Gauge({ value }) {
-    const rotation = Math.min(Math.max(value, 0), 100) * 1.8 - 90;
-
     return (
       <div className="relative w-44 h-24 overflow-hidden">
         <div className="absolute inset-x-0 bottom-0 h-44 rounded-full border-[22px] border-gray-200"></div>
+
         <div
           className="absolute inset-x-0 bottom-0 h-44 rounded-full border-[22px] border-green-500"
           style={{
             clipPath: "inset(0 0 50% 0)",
-            transform: `rotate(${rotation}deg)`,
+            transform: `rotate(${value * 1.8 - 90}deg)`,
           }}
         ></div>
+
         <div className="absolute bottom-0 left-1/2 -translate-x-1/2 text-center">
           <p className="text-2xl font-bold text-black">{value}%</p>
         </div>
+
         <span className="absolute bottom-0 left-0 text-xs text-gray-400">0</span>
-        <span className="absolute bottom-0 right-0 text-xs text-gray-400">100</span>
+        <span className="absolute bottom-0 right-0 text-xs text-gray-400">
+          100
+        </span>
       </div>
     );
   }
@@ -196,62 +199,67 @@ export default function Home() {
           </div>
         )}
 
-        <div className="grid gap-8 max-w-3xl">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
           {resultados.map((voo) => {
             const probabilidade = calcularProbabilidade(voo);
 
             return (
               <div
                 key={voo.id}
-                className="bg-white border border-gray-300 rounded-xl shadow-md overflow-hidden"
+                className="bg-white border border-gray-300 rounded-xl shadow-md overflow-hidden flex flex-col w-full"
               >
                 <div className="bg-gray-100 px-6 py-5 border-b flex justify-between items-center">
                   <div>
                     <p className="text-lg font-semibold text-[#0b2545]">
                       {voo.origin} → {voo.destination}
                     </p>
+
                     <p className="text-sm text-gray-500">
-                      {formatarData(dataIda)} {dataVolta && `- ${formatarData(dataVolta)}`}
+                      {formatarData(dataIda)}{" "}
+                      {dataVolta && `- ${formatarData(dataVolta)}`}
                     </p>
                   </div>
+
                   <span className="text-gray-500">⌄</span>
                 </div>
 
                 <div className="px-6 py-5 border-b flex items-center gap-5">
-                  <div className="w-20 h-12 bg-[#24126a] text-white rounded flex items-center justify-center text-xs font-bold">
-                    {voo.airline?.slice(0, 10)}
+                  <div className="w-24 h-12 bg-[#24126a] text-white rounded flex items-center justify-center text-xs font-bold text-center">
+                    {voo.airline?.slice(0, 12) || "Cia Aérea"}
                   </div>
 
                   <div>
                     <p className="text-xl font-bold text-[#07111f]">
                       {voo.departureTime
-                        ? new Date(voo.departureTime).toLocaleTimeString("pt-BR", {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })
+                        ? new Date(voo.departureTime).toLocaleTimeString(
+                            "pt-BR",
+                            {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            }
+                          )
                         : "--:--"}{" "}
                       -{" "}
                       {voo.arrivalTime
-                        ? new Date(voo.arrivalTime).toLocaleTimeString("pt-BR", {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })
+                        ? new Date(voo.arrivalTime).toLocaleTimeString(
+                            "pt-BR",
+                            {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            }
+                          )
                         : "--:--"}
                     </p>
 
                     <p className="text-base text-[#07111f]">
                       {voo.origin}-{voo.destination}{" "}
-                      {voo.stops === 0
-                        ? "Direto"
-                        : `${voo.stops} escala(s)`}
+                      {voo.stops === 0 ? "Direto" : `${voo.stops} escala(s)`}
                     </p>
                   </div>
                 </div>
 
-                <div className="px-6 py-6">
-                  <p className="text-3xl font-light mb-2">
-                    {voo.priceText}
-                  </p>
+                <div className="px-6 py-6 flex-1">
+                  <p className="text-3xl font-light mb-3">{voo.priceText}</p>
 
                   <div className="inline-block bg-cyan-400 text-white font-bold px-4 py-2 rounded mb-2">
                     Espere, o preço pode descer
