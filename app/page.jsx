@@ -97,38 +97,23 @@ export default function Home() {
             fill="none"
             stroke="#e5e7eb"
             strokeWidth="24"
-            strokeLinecap="butt"
             pathLength="100"
           />
-
           <path
             d="M 25 95 A 75 75 0 0 1 175 95"
             fill="none"
             stroke="#4ade00"
             strokeWidth="24"
-            strokeLinecap="butt"
             pathLength="100"
             strokeDasharray={`${safeValue} 100`}
           />
 
-          <text
-            x="100"
-            y="88"
-            textAnchor="middle"
-            fontSize="22"
-            fontWeight="700"
-            fill="#000"
-          >
+          <text x="100" y="88" textAnchor="middle" fontSize="22" fontWeight="700">
             {safeValue}%
           </text>
 
-          <text x="22" y="112" fontSize="11" fill="#9ca3af">
-            0
-          </text>
-
-          <text x="166" y="112" fontSize="11" fill="#9ca3af">
-            100
-          </text>
+          <text x="22" y="112" fontSize="11" fill="#9ca3af">0</text>
+          <text x="166" y="112" fontSize="11" fill="#9ca3af">100</text>
         </svg>
       </div>
     );
@@ -136,232 +121,126 @@ export default function Home() {
 
   return (
     <main className="min-h-screen bg-[#031B34] text-white">
+
+      {/* HERO */}
       <section className="grid grid-cols-1 lg:grid-cols-2 gap-12 px-8 lg:px-24 py-16">
         <div>
-          <img
-            src="/logo-redwood.png"
-            alt="Redwood Viagens"
-            className="w-56 mb-10"
-          />
+          <img src="/logo-redwood.png" className="w-56 mb-10" />
 
           <h1 className="text-5xl lg:text-7xl font-serif leading-tight">
             Viaje com economia,{" "}
-            <span className="text-yellow-400 italic">segurança</span> e suporte
-            completo.
+            <span className="text-yellow-400 italic">segurança</span> e suporte completo.
           </h1>
 
           <p className="mt-8 text-lg text-blue-100 max-w-xl">
-            A Redwood busca oportunidades, acompanha a variação dos preços e
-            conecta você com atendimento humano para decidir com segurança.
+            A Redwood busca oportunidades e conecta você com atendimento humano.
           </p>
         </div>
 
         <form
           onSubmit={buscarVoos}
-          className="bg-[#020F1F] border border-yellow-500/40 rounded-3xl p-8 shadow-2xl"
+          className="bg-[#020F1F] border border-yellow-500/40 rounded-3xl p-8"
         >
-          <p className="text-yellow-400 tracking-[0.4em] text-xs mb-4">
-            BUSCA INTELIGENTE
-          </p>
+          <h2 className="text-3xl font-bold mb-6">Pesquisar passagem</h2>
 
-          <h2 className="text-3xl font-bold mb-2">Pesquisar passagem</h2>
+          <div className="grid grid-cols-2 gap-4">
+            <input value={origem} onChange={e=>setOrigem(e.target.value)} className="p-4 text-black rounded-xl"/>
+            <input value={destino} onChange={e=>setDestino(e.target.value)} className="p-4 text-black rounded-xl"/>
 
-          <div className="grid grid-cols-2 gap-4 mt-8">
-            <label className="text-sm">
-              Origem (IATA)
-              <input
-                value={origem}
-                onChange={(e) => setOrigem(e.target.value)}
-                className="mt-2 w-full rounded-xl p-4 text-black font-bold"
-              />
-            </label>
-
-            <label className="text-sm">
-              Destino (IATA)
-              <input
-                value={destino}
-                onChange={(e) => setDestino(e.target.value)}
-                className="mt-2 w-full rounded-xl p-4 text-black font-bold"
-              />
-            </label>
-
-            <label className="text-sm">
-              Ida
-              <input
-                type="date"
-                value={dataIda}
-                onChange={(e) => setDataIda(e.target.value)}
-                className="mt-2 w-full rounded-xl p-4 text-black font-bold"
-              />
-            </label>
-
-            <label className="text-sm">
-              Volta
-              <input
-                type="date"
-                value={dataVolta}
-                onChange={(e) => setDataVolta(e.target.value)}
-                className="mt-2 w-full rounded-xl p-4 text-black font-bold"
-              />
-            </label>
+            <input type="date" value={dataIda} onChange={e=>setDataIda(e.target.value)} className="p-4 text-black rounded-xl"/>
+            <input type="date" value={dataVolta} onChange={e=>setDataVolta(e.target.value)} className="p-4 text-black rounded-xl"/>
           </div>
 
-          <label className="block mt-4 text-sm">
-            Passageiros
-            <input
-              type="number"
-              min="1"
-              value={adultos}
-              onChange={(e) => setAdultos(e.target.value)}
-              className="mt-2 w-full rounded-xl p-4 text-black font-bold"
-            />
-          </label>
+          <input type="number" value={adultos} onChange={e=>setAdultos(e.target.value)} className="mt-4 p-4 w-full text-black rounded-xl"/>
 
-          <button
-            type="submit"
-            className="mt-6 w-full rounded-xl bg-yellow-400 text-black font-bold p-4 hover:bg-yellow-300"
-          >
-            {loading ? "Buscando..." : "🔎 Buscar melhores preços"}
+          <button className="mt-6 w-full bg-yellow-400 text-black p-4 rounded-xl font-bold">
+            {loading ? "Buscando..." : "Buscar preços"}
           </button>
 
-          {erro && <p className="mt-4 text-red-400">{erro}</p>}
+          {erro && <p className="text-red-400 mt-3">{erro}</p>}
         </form>
       </section>
 
+      {/* RESULTADOS */}
       <section className="bg-[#f3f6f9] text-black px-6 lg:px-24 py-12">
-        <p className="text-yellow-600 tracking-[0.4em] text-xs mb-3">
-          RESULTADOS
-        </p>
 
-        <h2 className="text-3xl font-bold mb-8 text-[#07111f]">
-          Voos encontrados
-        </h2>
-
-        {resultados.length === 0 && !loading && (
-          <div className="bg-white border rounded-xl p-8 text-gray-600">
-            Faça uma busca para visualizar as oportunidades disponíveis.
-          </div>
-        )}
+        <h2 className="text-3xl font-bold mb-8">Voos encontrados</h2>
 
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+
           {resultados.map((voo) => {
-            const probabilidade = calcularProbabilidade(voo);
+            const prob = calcularProbabilidade(voo);
 
             return (
-              <div
-                key={voo.id}
-                className="bg-white border border-gray-300 rounded-xl shadow-md overflow-hidden flex flex-col w-full"
-              >
-                <div className="bg-gray-100 px-6 py-5 border-b flex justify-between items-center">
+              <div key={voo.id} className="bg-white rounded-xl shadow-md">
+
+                {/* HEADER */}
+                <div className="bg-gray-100 px-6 py-5 flex justify-between">
                   <div>
-                    <p className="text-lg font-semibold text-[#0b2545]">
-                      {voo.origin} → {voo.destination}
-                    </p>
-
-                    <p className="text-sm text-gray-500">
-                      {formatarData(dataIda)}{" "}
-                      {dataVolta && `- ${formatarData(dataVolta)}`}
-                    </p>
-                  </div>
-
-                  <span className="text-gray-500">⌄</span>
-                </div>
-
-                <div className="px-6 py-5 border-b flex items-center gap-5">
-                  <div className="w-24 h-14 bg-[#24126a] rounded flex items-center justify-center p-2">
-                    {voo.airlineLogo ? (
-                      <img
-                        src={voo.airlineLogo}
-                        alt={voo.airline || "Companhia aérea"}
-                        className="max-w-full max-h-full object-contain"
-                      />
-                    ) : (
-                      <span className="text-white text-xs font-bold text-center">
-                        {voo.airline?.slice(0, 12) || "Cia Aérea"}
-                      </span>
-                    )}
-                  </div>
-
-                  <div>
-                    <p className="text-xl font-bold text-[#07111f]">
-                      {voo.departureTime
-                        ? new Date(voo.departureTime).toLocaleTimeString(
-                            "pt-BR",
-                            {
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            }
-                          )
-                        : "--:--"}{" "}
-                      -{" "}
-                      {voo.arrivalTime
-                        ? new Date(voo.arrivalTime).toLocaleTimeString(
-                            "pt-BR",
-                            {
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            }
-                          )
-                        : "--:--"}
-                    </p>
-
-                    <p className="text-base text-[#07111f]">
-                      {voo.origin}-{voo.destination}{" "}
-                      {voo.stops === 0 ? "Direto" : `${voo.stops} escala(s)`}
-                    </p>
+                    <p className="font-semibold">{voo.origin} → {voo.destination}</p>
+                    <p className="text-sm text-gray-500">{formatarData(dataIda)}</p>
                   </div>
                 </div>
 
-                <div className="px-6 py-6 flex-1">
-                  <p className="text-3xl font-bold text-[#07111f] mb-1">
+                {/* COMPANHIA */}
+                <div className="px-6 py-5 flex items-center gap-4">
+
+                  <div className="w-20 h-12 flex items-center justify-center">
+                    <img src={voo.airlineLogo} className="max-h-full object-contain"/>
+                  </div>
+
+                  <div>
+                    <p className="font-bold">
+                      {new Date(voo.departureTime).toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"})}
+                      {" - "}
+                      {new Date(voo.arrivalTime).toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"})}
+                    </p>
+                    <p>{voo.origin}-{voo.destination} Direto</p>
+                  </div>
+
+                </div>
+
+                {/* PREÇO */}
+                <div className="px-6 pb-6">
+
+                  <p className="text-3xl font-bold mb-2">
                     {converterParaBRL(voo.price)}
                   </p>
 
-                  <p className="text-sm text-gray-500 mb-3">
-                    Valor original: {voo.priceText}
-                  </p>
-
-                  <div className="inline-block bg-cyan-400 text-white font-bold px-4 py-2 rounded mb-2">
-                    {textoAlerta(probabilidade)}
+                  <div className="bg-cyan-400 text-white px-4 py-2 rounded inline-block">
+                    {textoAlerta(prob)}
                   </div>
 
-                  <span className="ml-2 text-sm text-blue-600">Por quê?</span>
+                  <p className="mt-5 font-bold">Probabilidade de descida</p>
+                  <Gauge value={prob}/>
 
-                  <p className="font-bold mt-6 mb-3">
-                    Probabilidade de descida
-                  </p>
+                  <div className="mt-6 flex gap-3">
 
-                  <Gauge value={probabilidade} />
-
-                  <div className="mt-8 flex flex-wrap gap-3">
                     <a
-                      href={`https://wa.me/${WHATSAPP}?text=Olá, quero reservar essa passagem ${voo.origin} para ${voo.destination} por ${converterParaBRL(
-                        voo.price
-                      )}. Valor original: ${voo.priceText}`}
-                      target="_blank"
-                      className="bg-blue-600 text-white px-5 py-3 rounded font-bold"
+                      href={`https://wa.me/${WHATSAPP}?text=Quero reservar voo ${voo.origin} → ${voo.destination} por ${converterParaBRL(voo.price)}`}
+                      className="bg-blue-600 text-white px-4 py-3 rounded font-bold"
                     >
-                      ✔ Reservar agora
+                      Reservar
                     </a>
 
                     <a
-                      href={`https://wa.me/${WHATSAPP}?text=Quero criar alerta de preço para voo ${voo.origin} → ${voo.destination} em ${formatarData(
-                        dataIda
-                      )}. Me avise quando baixar. Valor atual: ${converterParaBRL(
-                        voo.price
-                      )}`}
-                      target="_blank"
+                      href={`https://wa.me/${WHATSAPP}?text=Quero alerta de preço ${voo.origin} → ${voo.destination}`}
                       style={{ backgroundColor: REDWOOD_RED }}
-                      className="text-white px-5 py-3 rounded font-bold hover:opacity-90"
+                      className="text-white px-4 py-3 rounded font-bold"
                     >
-                      🔔 Criar alerta de preço
+                      🔔 Alerta
                     </a>
+
                   </div>
+
                 </div>
+
               </div>
             );
           })}
+
         </div>
+
       </section>
     </main>
   );
