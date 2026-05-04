@@ -1,372 +1,402 @@
-'use client';
+"use client";
 
-import { useMemo, useState } from 'react';
-import { Plane, Search, MessageCircle, ShieldCheck, Clock, Bell, TrendingDown, TrendingUp, Loader2, X, Target, Sparkles, Send } from 'lucide-react';
+import { useMemo, useState } from "react";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://redwood-backend-production.up.railway.app';
-const WHATSAPP_PHONE = process.env.NEXT_PUBLIC_WHATSAPP_PHONE || '5555992290849';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
+const WHATSAPP_NUMBER = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || "55992290849";
 
-function money(value, currency = 'BRL') {
-  const safeCurrency = currency || 'BRL';
-  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: safeCurrency }).format(Number(value || 0));
+const formatCurrency = (value, currency = "BRL") => {
+  const number = Number(value || 0);
+  return new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency,
+    minimumFractionDigits: 2,
+  }).format(number);
+};
+
+const normalizePrice = (flight) => {
+  const raw =
+    flight?.price ??
+    flight?.total_amount ??
+    flight?.totalAmount ??
+    flight?.amount ??
+    flight?.total ??
+    0;
+
+  const value = Number(raw);
+  const currency = flight?.currency || flight?.total_currency || "BRL";
+
+  // Enquanto a Duffel estiver em test mode, pode vir em USD.
+  // Para produção, o ideal é o backend já devolver BRL.
+  if (currency === "USD") return { value: value * 5.2, currency: "BRL" };
+  return { value, currency };
+};
+
+const buildWhatsAppLink = (flight, search) => {
+  const { value } = normalizePrice(flight);
+  const route = `${search.origin} → ${search.destination}`;
+  const airline = flight?.airline || flight?.carrier || flight?.company || "Companhia a confirmar";
+  const text = `Olá, Redwood Viagens! Tenho interesse nessa passagem:\n\nRota: ${route}\nIda: ${search.departureDate}\nVolta: ${search.returnDate || "sem volta"}\nCompanhia: ${airline}\nValor encontrado: ${formatCurrency(value)}\n\nPode verificar disponibilidade para mim?`;
+
+  return `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(text)}`;
+};
+
+function PriceGauge({ percent = 68 }) {
+  const safePercent = Math.max(0, Math.min(100, Number(percent) || 0));
+  const circumference = 251.2;
+  const dash = (safePercent / 100) * circumference;
+
+  return (
+    <div className="relative mx-auto flex h-52 w-52 items-center justify-center">
+      <svg viewBox="0 0 120 120" className="h-full w-full -rotate-90 drop-shadow-[0_0_22px_rgba(212,175,55,0.35)]">
+        <circle cx="60" cy="60" r="40" fill="none" stroke="rgba(255,255,255,0.10)" strokeWidth="13" />
+        <circle
+          cx="60"
+          cy="60"
+          r="40"
+          fill="none"
+          stroke="url(#redwoodGauge)"
+          strokeWidth="13"
+          strokeLinecap="round"
+          strokeDasharray={`${dash} ${circumference}`}
+        />
+        <defs>
+          <linearGradient id="redwoodGauge" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stopColor="#D4AF37" />
+            <stop offset="55%" stopColor="#F5C542" />
+            <stop offset="100%" stopColor="#E53935" />
+          </linearGradient>
+        </defs>
+      </svg>
+
+      <div className="absolute text-center">
+        <div className="text-5xl font-black text-white">{safePercent}%</div>
+        <div className="mt-1 text-xs font-semibold uppercase tracking-[0.22em] text-[#D4AF37]">risco de alta</div>
+      </div>
+    </div>
+  );
 }
 
-function formatDateTime(value) {
-  if (!value) return '-';
-  try {
-    return new Date(value).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
-  } catch {
-    return value;
-  }
-}
+function FlightCard({ flight, search, onAlert }) {
+  const { value } = normalizePrice(flight);
+  const airline = flight?.airline || flight?.carrier || flight?.company || "Companhia a confirmar";
+  const departure = flight?.departureTime || flight?.departure_time || flight?.departure || "Horário a confirmar";
+  const arrival = flight?.arrivalTime || flight?.arrival_time || flight?.arrival || "Horário a confirmar";
 
-function normalizeOffers(response) {
-  const offers = response?.offers || response?.data?.offers || response?.data || [];
-  if (!Array.isArray(offers)) return [];
+  return (
+    <article className="group rounded-3xl border border-white/10 bg-[#020617]/90 p-6 shadow-2xl transition duration-300 hover:-translate-y-1 hover:border-[#D4AF37]/70 hover:shadow-[0_0_35px_rgba(212,175,55,0.18)]">
+      <div className="mb-5 flex items-start justify-between gap-4">
+        <div>
+          <h3 className="text-xl font-black text-white">{search.origin} → {search.destination}</h3>
+          <p className="mt-1 text-sm text-[#CBD5E1]">{airline}</p>
+        </div>
+        <div className="rounded-full border border-[#D4AF37]/30 bg-[#D4AF37]/10 px-3 py-2 text-[#D4AF37]">✈</div>
+      </div>
 
-  return offers.map((offer, index) => {
-    const rawPrice = Number(offer.price || offer.total_amount || offer.totalAmount || 0);
-    const currency = offer.currency || offer.total_currency || 'USD';
-    const outbound = offer.outbound || {};
-    const inbound = offer.inbound || null;
-    const firstSlice = offer.slices?.[0] || offer.itineraries?.[0] || {};
-    const firstSegment = firstSlice?.segments?.[0] || {};
-    const lastSegment = firstSlice?.segments?.[firstSlice?.segments?.length - 1] || firstSegment;
+      <div className="mb-5 rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+        <p className="text-sm text-[#CBD5E1]">Melhor valor encontrado</p>
+        <p className="mt-1 text-4xl font-black text-[#D4AF37]">{formatCurrency(value)}</p>
+      </div>
 
-    const airline = offer.airline || outbound.airlineName || firstSegment?.marketing_carrier?.name || firstSegment?.operating_carrier?.name || 'Companhia aérea não informada';
-    const airlineCode = offer.airlineCode || outbound.airlineCode || firstSegment?.marketing_carrier?.iata_code || firstSegment?.operating_carrier?.iata_code || '';
-    const depart = outbound.departingAt || firstSegment?.departing_at || firstSegment?.departure_time || '';
-    const arrive = outbound.arrivingAt || lastSegment?.arriving_at || lastSegment?.arrival_time || '';
-    const returnDepart = inbound?.departingAt || '';
-    const returnArrive = inbound?.arrivingAt || '';
-    const stops = typeof outbound.stops === 'number' ? outbound.stops : Math.max((firstSlice?.segments?.length || 1) - 1, 0);
+      <div className="grid grid-cols-2 gap-3 text-sm text-[#CBD5E1]">
+        <div>
+          <p className="font-bold text-white">Saída</p>
+          <p>{departure}</p>
+        </div>
+        <div>
+          <p className="font-bold text-white">Chegada</p>
+          <p>{arrival}</p>
+        </div>
+      </div>
 
-    return {
-      id: offer.id || `offer-${index}`,
-      provider: offer.provider || response?.provider || 'duffel',
-      liveMode: offer.liveMode ?? offer.live_mode ?? false,
-      rawPrice,
-      currency,
-      airline,
-      airlineCode,
-      depart,
-      arrive,
-      returnDepart,
-      returnArrive,
-      stops,
-      outbound,
-      inbound,
-      raw: offer
-    };
-  }).sort((a, b) => a.rawPrice - b.rawPrice);
-}
-
-function predictionFor(price, averagePrice, daysAhead) {
-  let probability = 62;
-  if (daysAhead > 60) probability += 14;
-  if (daysAhead < 20) probability -= 18;
-  if (averagePrice && price > averagePrice * 1.12) probability += 10;
-  if (averagePrice && price < averagePrice * 0.9) probability -= 12;
-  probability = Math.max(28, Math.min(91, Math.round(probability)));
-  return {
-    probability,
-    trend: probability >= 60 ? 'down' : 'up',
-    label: probability >= 60 ? 'Espere, o preço pode baixar' : 'Atenção, o preço pode subir'
-  };
+      <div className="mt-6 space-y-3">
+        <a
+          href={buildWhatsAppLink(flight, search)}
+          target="_blank"
+          rel="noreferrer"
+          className="block w-full rounded-2xl bg-gradient-to-r from-[#D4AF37] to-[#F5C542] px-5 py-3 text-center font-black text-[#020817] shadow-lg shadow-[#D4AF37]/20 transition hover:scale-[1.01]"
+        >
+          💬 Falar com especialista agora
+        </a>
+        <button
+          type="button"
+          onClick={() => onAlert(flight)}
+          className="w-full rounded-2xl border border-[#D4AF37]/30 bg-[#D4AF37]/10 px-5 py-3 font-bold text-[#D4AF37] transition hover:bg-[#D4AF37]/20"
+        >
+          🔔 Ser avisado quando baixar
+        </button>
+      </div>
+    </article>
+  );
 }
 
 export default function Home() {
-  const [origin, setOrigin] = useState('POA');
-  const [destination, setDestination] = useState('GIG');
-  const [departureDate, setDepartureDate] = useState('2026-06-12');
-  const [returnDate, setReturnDate] = useState('2026-06-17');
-  const [adults, setAdults] = useState(1);
+  const [search, setSearch] = useState({
+    origin: "POA",
+    destination: "GIG",
+    departureDate: "2026-06-12",
+    returnDate: "2026-06-17",
+    passengers: 1,
+  });
+
+  const [flights, setFlights] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [result, setResult] = useState(null);
-  const [selectedOffer, setSelectedOffer] = useState(null);
-  const [alertStatus, setAlertStatus] = useState('');
+  const [error, setError] = useState("");
+  const [selectedFlight, setSelectedFlight] = useState(null);
+  const [alertForm, setAlertForm] = useState({ name: "", whatsapp: "", targetPrice: "" });
+  const [alertStatus, setAlertStatus] = useState("");
 
-  const offers = useMemo(() => normalizeOffers(result), [result]);
-  const averagePrice = offers.length ? offers.reduce((sum, item) => sum + item.rawPrice, 0) / offers.length : 0;
-  const bestOffer = offers[0];
-  const daysAhead = Math.ceil((new Date(departureDate) - new Date()) / (1000 * 60 * 60 * 24));
-  const prediction = bestOffer ? predictionFor(bestOffer.rawPrice, averagePrice, daysAhead) : null;
+  const bestFlight = useMemo(() => {
+    if (!flights.length) return null;
+    return [...flights].sort((a, b) => normalizePrice(a).value - normalizePrice(b).value)[0];
+  }, [flights]);
 
-  async function searchFlights(e) {
-    e.preventDefault();
+  const bestPrice = bestFlight ? normalizePrice(bestFlight).value : 0;
+  const averagePrice = flights.length
+    ? flights.reduce((sum, flight) => sum + normalizePrice(flight).value, 0) / flights.length
+    : 0;
+
+  const riskPercent = bestPrice && averagePrice
+    ? Math.min(92, Math.max(38, Math.round(((averagePrice - bestPrice) / Math.max(bestPrice, 1)) * 100 + 55)))
+    : 68;
+
+  async function handleSearch(event) {
+    event.preventDefault();
     setLoading(true);
-    setError('');
-    setResult(null);
+    setError("");
+    setFlights([]);
+
     try {
-      const params = new URLSearchParams({ origin, destination, departureDate, returnDate, adults: String(adults) });
-      const response = await fetch(`${API_URL}/api/flights/search?${params.toString()}`);
+      const response = await fetch(`${API_URL}/api/flights`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(search),
+      });
+
+      if (!response.ok) throw new Error("Não foi possível buscar voos agora.");
+
       const data = await response.json();
-      if (!response.ok || data.error) throw new Error(data.error || 'Erro ao buscar voos');
-      setResult(data);
+      const results = data?.flights || data?.offers || data?.data || [];
+      setFlights(Array.isArray(results) ? results : []);
     } catch (err) {
-      setError(err.message || 'Não foi possível buscar os voos agora.');
+      setError(err.message || "Erro ao buscar voos.");
     } finally {
       setLoading(false);
     }
   }
 
-  function whatsappLink(offer) {
-    const text = `Olá, vim pelo buscador da Redwood Viagens. Quero cotar passagem:\n\nOrigem: ${origin}\nDestino: ${destination}\nIda: ${departureDate}\nVolta: ${returnDate || 'não informada'}\nPassageiros: ${adults}\nPreço encontrado: ${money(offer.rawPrice, offer.currency)}\nCompanhia: ${offer.airline}\nHorário ida: ${formatDateTime(offer.depart)}\n${offer.returnDepart ? `Horário volta: ${formatDateTime(offer.returnDepart)}\n` : ''}Pode me ajudar?`;
-    return `https://wa.me/${WHATSAPP_PHONE}?text=${encodeURIComponent(text)}`;
-  }
+  async function handleCreateAlert(event) {
+    event.preventDefault();
+    if (!selectedFlight) return;
 
-  return (
-    <main className="min-h-screen bg-slate-950 text-white">
-      <section className="relative overflow-hidden border-b border-white/10">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,#2563eb_0%,transparent_35%),radial-gradient(circle_at_bottom_right,#991b1b_0%,transparent_28%)] opacity-60" />
-        <div className="relative mx-auto max-w-7xl px-4 py-10 md:py-16">
-          <div className="grid gap-8 lg:grid-cols-[1.05fr_0.95fr] lg:items-center">
-            <div>
-              <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-yellow-400/30 bg-yellow-400/10 px-4 py-2 text-sm text-yellow-200">
-                <Plane size={16} /> Redwood Viagens • Busca Inteligente
-              </div>
-              <h1 className="text-4xl font-black leading-tight md:text-6xl">Encontre passagens e seja avisado quando baixar.</h1>
-              <p className="mt-5 max-w-xl text-lg text-slate-300">Busque ofertas via API, veja companhia, horários e crie um alerta para a Redwood acompanhar seu preço ideal.</p>
-              <div className="mt-6 flex flex-wrap gap-3 text-sm text-slate-200">
-                <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-2"><ShieldCheck size={16} /> Atendimento seguro</span>
-                <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-2"><Clock size={16} /> Suporte 24h</span>
-                <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-2"><Bell size={16} /> Alerta de preço</span>
-              </div>
-            </div>
+    setAlertStatus("Salvando alerta...");
 
-            <form onSubmit={searchFlights} className="rounded-3xl border border-white/10 bg-white p-5 text-slate-900 shadow-2xl">
-              <h2 className="mb-4 text-2xl font-black">Pesquisar passagem</h2>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <Field label="Origem (IATA)" value={origin} onChange={setOrigin} placeholder="POA" />
-                <Field label="Destino (IATA)" value={destination} onChange={setDestination} placeholder="GIG" />
-                <DateField label="Ida" value={departureDate} onChange={setDepartureDate} />
-                <DateField label="Volta" value={returnDate} onChange={setReturnDate} />
-                <label className="space-y-1 text-sm font-bold sm:col-span-2">Passageiros
-                  <input type="number" min="1" value={adults} onChange={(e) => setAdults(e.target.value)} className="w-full rounded-xl border border-slate-200 px-3 py-3 outline-none focus:border-blue-600" />
-                </label>
-              </div>
-              <button disabled={loading} className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-blue-700 px-5 py-4 font-black text-white hover:bg-blue-800 disabled:opacity-60">
-                {loading ? <Loader2 className="animate-spin" size={18} /> : <Search size={18} />} Pesquisar voos
-              </button>
-              <p className="mt-3 text-xs text-slate-500">Use aeroportos específicos: POA, GIG, SDU, GRU, CGH, MCZ, MIA, LIS.</p>
-            </form>
-          </div>
-        </div>
-      </section>
-
-      <section className="mx-auto max-w-7xl px-4 py-8">
-        {error && <div className="rounded-2xl border border-red-400/30 bg-red-500/10 p-4 text-red-100">{error}</div>}
-
-        {bestOffer && (
-          <div className="mb-6 grid gap-4 lg:grid-cols-3">
-            <div className="rounded-3xl border border-white/10 bg-white p-6 text-slate-900 shadow-xl lg:col-span-2">
-              <p className="text-sm font-bold text-slate-500">Melhor preço encontrado</p>
-              <div className="mt-2 flex flex-wrap items-end justify-between gap-3">
-                <div>
-                  <div className="text-4xl font-black md:text-5xl">{money(bestOffer.rawPrice, bestOffer.currency)}</div>
-                  <p className="mt-1 text-sm text-slate-500">Média encontrada: {money(averagePrice, bestOffer.currency)} • {bestOffer.liveMode ? 'Live mode' : 'Modo teste Duffel'}</p>
-                  <p className="mt-2 text-sm font-semibold text-slate-700">{bestOffer.airline} • Saída {formatDateTime(bestOffer.depart)}</p>
-                </div>
-                <div className="flex flex-col gap-2 sm:flex-row">
-                  <button onClick={() => setSelectedOffer(bestOffer)} className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-yellow-400 to-amber-500 px-5 py-4 font-black text-slate-950 shadow-lg shadow-yellow-500/20 hover:brightness-105">
-                    <Bell size={18} /> Criar alerta inteligente
-                  </button>
-                  <a href={whatsappLink(bestOffer)} target="_blank" className="inline-flex items-center justify-center gap-2 rounded-xl bg-green-600 px-5 py-4 font-black text-white hover:bg-green-700">
-                    <MessageCircle size={18} /> Cotar no WhatsApp
-                  </a>
-                </div>
-              </div>
-            </div>
-            <div className="rounded-3xl border border-white/10 bg-white/10 p-6 backdrop-blur">
-              <div className={`inline-flex items-center gap-2 rounded-xl px-3 py-2 font-bold ${prediction.trend === 'down' ? 'bg-cyan-400 text-slate-950' : 'bg-red-500 text-white'}`}>
-                {prediction.trend === 'down' ? <TrendingDown size={18} /> : <TrendingUp size={18} />} {prediction.label}
-              </div>
-              <p className="mt-5 text-sm text-slate-300">Probabilidade estimada de baixa</p>
-              <Gauge value={prediction.probability} />
-            </div>
-          </div>
-        )}
-
-        {offers.length > 0 && (
-          <div>
-            <h2 className="mb-4 text-2xl font-black">Voos encontrados</h2>
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              {offers.slice(0, 12).map((offer) => (
-                <article key={offer.id} className="rounded-3xl border border-white/10 bg-white p-5 text-slate-900 shadow-xl">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="font-black">{origin} → {destination}</p>
-                      <p className="mt-1 text-sm text-slate-500">{offer.airline} {offer.airlineCode ? `(${offer.airlineCode})` : ''}</p>
-                    </div>
-                    <Plane className="text-blue-700" />
-                  </div>
-                  <div className="mt-4 text-3xl font-black">{money(offer.rawPrice, offer.currency)}</div>
-                  <p className="mt-1 text-xs text-slate-500">{offer.liveMode ? 'Oferta live' : 'Oferta em modo teste'} • Provider: {offer.provider}</p>
-                  <div className="mt-3 grid grid-cols-2 gap-2 text-sm text-slate-600">
-                    <div><strong>Saída:</strong><br />{formatDateTime(offer.depart)}</div>
-                    <div><strong>Chegada:</strong><br />{formatDateTime(offer.arrive)}</div>
-                    {offer.returnDepart && <div><strong>Volta:</strong><br />{formatDateTime(offer.returnDepart)}</div>}
-                    {offer.returnArrive && <div><strong>Chegada volta:</strong><br />{formatDateTime(offer.returnArrive)}</div>}
-                  </div>
-                  <p className="mt-3 text-sm text-slate-500">{offer.stops === 0 ? 'Voo direto' : `${offer.stops} escala(s)`}</p>
-                  <div className="mt-4 grid gap-2">
-                    <button onClick={() => setSelectedOffer(offer)} className="flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-yellow-400 to-amber-500 px-4 py-3 font-black text-slate-950 hover:brightness-105">
-                      <Target size={18} /> Quero pagar menos
-                    </button>
-                    <a href={whatsappLink(offer)} target="_blank" className="flex items-center justify-center gap-2 rounded-xl bg-green-600 px-4 py-3 font-black text-white hover:bg-green-700">
-                      <MessageCircle size={18} /> Enviar cotação
-                    </a>
-                  </div>
-                </article>
-              ))}
-            </div>
-          </div>
-        )}
-      </section>
-
-      {selectedOffer && (
-        <PriceAlertModal
-          offer={selectedOffer}
-          origin={origin}
-          destination={destination}
-          departureDate={departureDate}
-          returnDate={returnDate}
-          adults={adults}
-          onClose={() => { setSelectedOffer(null); setAlertStatus(''); }}
-          alertStatus={alertStatus}
-          setAlertStatus={setAlertStatus}
-        />
-      )}
-    </main>
-  );
-}
-
-function PriceAlertModal({ offer, origin, destination, departureDate, returnDate, adults, onClose, alertStatus, setAlertStatus }) {
-  const [nome, setNome] = useState('');
-  const [whatsapp, setWhatsapp] = useState('');
-  const [email, setEmail] = useState('');
-  const [targetPrice, setTargetPrice] = useState('');
-  const [notes, setNotes] = useState('');
-  const [saving, setSaving] = useState(false);
-
-  async function submitAlert(e) {
-    e.preventDefault();
-    setSaving(true);
-    setAlertStatus('');
     try {
+      const { value } = normalizePrice(selectedFlight);
       const payload = {
-        nome,
-        whatsapp,
-        email,
-        origem: origin,
-        destino: destination,
-        data_ida: departureDate,
-        data_volta: returnDate,
-        passageiros: Number(adults || 1),
-        preco_atual: offer.rawPrice,
-        moeda: offer.currency,
-        preco_desejado: Number(String(targetPrice).replace(',', '.')),
-        companhia: offer.airline,
-        codigo_companhia: offer.airlineCode,
-        horario_ida: offer.depart,
-        horario_volta: offer.returnDepart,
-        offer_id: offer.id,
-        provider: offer.provider,
-        live_mode: offer.liveMode,
-        observacoes: notes,
-        campanha: 'site-redwood-alerta-preco',
-        raw: offer.raw
+        origin: search.origin,
+        destination: search.destination,
+        departure_date: search.departureDate,
+        return_date: search.returnDate,
+        passengers: search.passengers,
+        target_price: Number(alertForm.targetPrice || value),
+        name: alertForm.name,
+        whatsapp: alertForm.whatsapp,
+        airline: selectedFlight?.airline || selectedFlight?.carrier || selectedFlight?.company || "Companhia a confirmar",
+        flight_summary: `${search.origin} → ${search.destination} | ${formatCurrency(value)}`,
       };
 
       const response = await fetch(`${API_URL}/api/price-alerts`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
       });
-      const data = await response.json();
-      if (!response.ok || data.error) throw new Error(data.error || 'Erro ao salvar alerta');
-      setAlertStatus('Alerta criado com sucesso! A Redwood vai acompanhar esse voo e falar com você no WhatsApp.');
-      if (data.whatsappLink) window.open(data.whatsappLink, '_blank');
+
+      if (!response.ok) throw new Error("Não foi possível salvar o alerta.");
+
+      setAlertStatus("✅ Alerta criado! A Redwood vai acompanhar esse preço para você.");
+      setTimeout(() => {
+        setSelectedFlight(null);
+        setAlertForm({ name: "", whatsapp: "", targetPrice: "" });
+        setAlertStatus("");
+      }, 1800);
     } catch (err) {
-      setAlertStatus(err.message || 'Não foi possível criar o alerta agora.');
-    } finally {
-      setSaving(false);
+      setAlertStatus(`❌ ${err.message || "Erro ao criar alerta."}`);
     }
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
-      <div className="relative w-full max-w-2xl overflow-hidden rounded-3xl border border-yellow-400/30 bg-slate-950 text-white shadow-2xl">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,#facc15_0%,transparent_28%),radial-gradient(circle_at_bottom_left,#2563eb_0%,transparent_32%)] opacity-30" />
-        <div className="relative p-6 md:p-8">
-          <button onClick={onClose} className="absolute right-4 top-4 rounded-full bg-white/10 p-2 hover:bg-white/20"><X size={18} /></button>
-          <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-yellow-400/30 bg-yellow-400/10 px-4 py-2 text-sm font-bold text-yellow-200">
-            <Sparkles size={16} /> Alerta Inteligente Redwood
-          </div>
-          <h2 className="text-3xl font-black">Quer pagar menos nesse voo?</h2>
-          <p className="mt-2 text-slate-300">Informe seu preço ideal. A Redwood salva seu alerta e acompanha a oportunidade para converter sua viagem com segurança.</p>
+    <main className="min-h-screen overflow-hidden bg-[#020817] text-white">
+      <section className="relative min-h-[720px] border-b border-[#E53935]/35">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_10%,rgba(11,31,58,0.75),transparent_38%),linear-gradient(135deg,#020817_0%,#061327_45%,#0B1F3A_100%)]" />
+        <div className="absolute inset-0 opacity-20 [background-image:linear-gradient(rgba(255,255,255,.04)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.04)_1px,transparent_1px)] [background-size:52px_52px]" />
+        <div className="absolute -right-24 top-10 h-96 w-96 rounded-full bg-[#E53935]/20 blur-3xl" />
+        <div className="absolute -left-24 bottom-0 h-96 w-96 rounded-full bg-[#D4AF37]/10 blur-3xl" />
 
-          <div className="mt-5 rounded-2xl bg-white p-4 text-slate-950">
-            <div className="grid gap-3 md:grid-cols-3">
-              <div><p className="text-xs font-bold text-slate-500">Rota</p><p className="font-black">{origin} → {destination}</p></div>
-              <div><p className="text-xs font-bold text-slate-500">Preço atual</p><p className="font-black">{money(offer.rawPrice, offer.currency)}</p></div>
-              <div><p className="text-xs font-bold text-slate-500">Companhia</p><p className="font-black">{offer.airline}</p></div>
+        <header className="relative z-10 mx-auto flex max-w-7xl items-center justify-between px-6 py-6">
+          <div className="flex items-center gap-4">
+            <div className="flex h-14 w-14 items-center justify-center rounded-full border border-[#D4AF37]/30 bg-white/5 text-2xl shadow-xl">✈️</div>
+            <div>
+              <p className="text-xl font-black tracking-wide text-white">REDWOOD</p>
+              <p className="text-xs font-bold tracking-[0.45em] text-[#E53935]">VIAGENS</p>
+            </div>
+          </div>
+          <a
+            href={`https://wa.me/${WHATSAPP_NUMBER}`}
+            target="_blank"
+            rel="noreferrer"
+            className="hidden rounded-full bg-gradient-to-r from-[#D4AF37] to-[#F5C542] px-6 py-3 font-black text-[#020817] shadow-lg shadow-[#D4AF37]/20 md:block"
+          >
+            Cotação grátis
+          </a>
+        </header>
+
+        <div className="relative z-10 mx-auto grid max-w-7xl grid-cols-1 items-center gap-12 px-6 pb-20 pt-8 lg:grid-cols-[1.05fr_.95fr]">
+          <div>
+            <div className="mb-8 flex items-center gap-4 text-xs font-black uppercase tracking-[0.45em] text-[#D4AF37]">
+              <span className="h-px w-14 bg-[#D4AF37]" /> Redwood Viagens
+            </div>
+
+            <h1 className="max-w-3xl font-serif text-5xl font-light leading-[1.04] text-white md:text-7xl">
+              Viaje com economia, <span className="italic text-[#D4AF37]">segurança</span> e inteligência.
+            </h1>
+
+            <p className="mt-7 max-w-2xl text-lg font-medium leading-8 text-[#CBD5E1]">
+              Busque passagens aéreas, compare oportunidades e receba alertas quando o preço baixar. A Redwood acompanha sua viagem do planejamento ao retorno.
+            </p>
+
+            <div className="mt-10 flex flex-wrap gap-4">
+              <a href="#busca" className="rounded-full bg-gradient-to-r from-[#D4AF37] to-[#F5C542] px-7 py-4 font-black text-[#020817] shadow-xl shadow-[#D4AF37]/20 transition hover:scale-[1.02]">
+                Buscar melhores preços →
+              </a>
+              <a href="#resultados" className="rounded-full border border-[#D4AF37]/40 bg-white/5 px-7 py-4 font-bold text-white transition hover:bg-white/10">
+                Ver oportunidades
+              </a>
+            </div>
+
+            <div className="mt-10 flex flex-wrap gap-6 text-sm font-semibold text-[#CBD5E1]">
+              <span>🛡️ Cadastro seguro</span>
+              <span>🎧 Suporte 24h</span>
+              <span>⭐ Atendimento humano</span>
             </div>
           </div>
 
-          <form onSubmit={submitAlert} className="mt-5 grid gap-3 md:grid-cols-2">
-            <Input label="Nome" value={nome} onChange={setNome} placeholder="Seu nome" required />
-            <Input label="WhatsApp" value={whatsapp} onChange={setWhatsapp} placeholder="5599999999999" required />
-            <Input label="E-mail (opcional)" value={email} onChange={setEmail} placeholder="email@email.com" />
-            <Input label={`Preço desejado (${offer.currency})`} value={targetPrice} onChange={setTargetPrice} placeholder="Ex: 450" required />
-            <label className="space-y-1 text-sm font-bold md:col-span-2">Observações
-              <textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Ex: tenho flexibilidade de data, aceito voo com escala, posso comprar hoje se chegar nesse valor..." className="min-h-24 w-full rounded-xl border border-white/10 bg-white/10 px-3 py-3 text-white outline-none placeholder:text-slate-400 focus:border-yellow-400" />
+          <form id="busca" onSubmit={handleSearch} className="rounded-[2rem] border border-[#D4AF37]/25 bg-[#020617]/85 p-6 shadow-2xl shadow-black/40 backdrop-blur-xl">
+            <div className="mb-6">
+              <p className="text-sm font-black uppercase tracking-[0.26em] text-[#D4AF37]">Busca inteligente</p>
+              <h2 className="mt-2 text-3xl font-black text-white">Pesquisar passagem</h2>
+              <p className="mt-2 text-sm text-[#CBD5E1]">Use aeroportos IATA: POA, GIG, GRU, SDU, MCZ, LIS.</p>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <label className="space-y-2 text-sm font-bold text-white">
+                Origem (IATA)
+                <input value={search.origin} onChange={(e) => setSearch({ ...search, origin: e.target.value.toUpperCase() })} className="w-full rounded-2xl border border-[#D4AF37]/20 bg-white/95 px-4 py-3 font-bold text-[#020817] outline-none focus:ring-2 focus:ring-[#D4AF37]" />
+              </label>
+              <label className="space-y-2 text-sm font-bold text-white">
+                Destino (IATA)
+                <input value={search.destination} onChange={(e) => setSearch({ ...search, destination: e.target.value.toUpperCase() })} className="w-full rounded-2xl border border-[#D4AF37]/20 bg-white/95 px-4 py-3 font-bold text-[#020817] outline-none focus:ring-2 focus:ring-[#D4AF37]" />
+              </label>
+              <label className="space-y-2 text-sm font-bold text-white">
+                Ida
+                <input type="date" value={search.departureDate} onChange={(e) => setSearch({ ...search, departureDate: e.target.value })} className="w-full rounded-2xl border border-[#D4AF37]/20 bg-white/95 px-4 py-3 font-bold text-[#020817] outline-none focus:ring-2 focus:ring-[#D4AF37]" />
+              </label>
+              <label className="space-y-2 text-sm font-bold text-white">
+                Volta
+                <input type="date" value={search.returnDate} onChange={(e) => setSearch({ ...search, returnDate: e.target.value })} className="w-full rounded-2xl border border-[#D4AF37]/20 bg-white/95 px-4 py-3 font-bold text-[#020817] outline-none focus:ring-2 focus:ring-[#D4AF37]" />
+              </label>
+            </div>
+
+            <label className="mt-4 block space-y-2 text-sm font-bold text-white">
+              Passageiros
+              <input type="number" min="1" value={search.passengers} onChange={(e) => setSearch({ ...search, passengers: Number(e.target.value) })} className="w-full rounded-2xl border border-[#D4AF37]/20 bg-white/95 px-4 py-3 font-bold text-[#020817] outline-none focus:ring-2 focus:ring-[#D4AF37]" />
             </label>
-            <button disabled={saving} className="md:col-span-2 flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-yellow-400 to-amber-500 px-5 py-4 font-black text-slate-950 shadow-lg shadow-yellow-500/20 hover:brightness-105 disabled:opacity-70">
-              {saving ? <Loader2 className="animate-spin" size={18} /> : <Send size={18} />} Criar alerta e enviar para Redwood
+
+            <button disabled={loading} className="mt-6 w-full rounded-2xl bg-gradient-to-r from-[#D4AF37] to-[#F5C542] px-6 py-4 font-black text-[#020817] shadow-xl shadow-[#D4AF37]/20 transition hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-60">
+              {loading ? "Buscando melhores oportunidades..." : "🔎 Buscar melhores preços"}
             </button>
+            {error && <p className="mt-4 rounded-2xl border border-[#E53935]/40 bg-[#E53935]/10 p-3 text-sm font-bold text-red-200">{error}</p>}
           </form>
-          {alertStatus && <div className="mt-4 rounded-2xl border border-white/10 bg-white/10 p-4 text-sm text-slate-100">{alertStatus}</div>}
         </div>
-      </div>
-    </div>
-  );
-}
+      </section>
 
-function Gauge({ value }) {
-  return (
-    <div className="mt-3 flex flex-col items-center">
-      <div className="relative h-24 w-48 overflow-hidden">
-        <div className="absolute left-0 top-0 h-48 w-48 rounded-full border-[18px] border-white/20" />
-        <div className="absolute left-0 top-0 h-48 w-48 rounded-full border-[18px] border-lime-400" style={{ clipPath: `polygon(0 50%, ${value}% 50%, ${value}% 0, 0 0)` }} />
-        <div className="absolute bottom-0 left-1/2 -translate-x-1/2 text-4xl font-black">{value}%</div>
-      </div>
-      <div className="mt-1 flex w-48 justify-between text-xs text-slate-400"><span>0</span><span>100</span></div>
-    </div>
-  );
-}
+      <section id="resultados" className="relative mx-auto max-w-7xl px-6 py-14">
+        {bestFlight && (
+          <div className="grid gap-6 lg:grid-cols-[1.25fr_.75fr]">
+            <div className="rounded-[2rem] border border-[#D4AF37]/25 bg-[#020617]/90 p-8 shadow-2xl">
+              <p className="text-sm font-black uppercase tracking-[0.26em] text-[#D4AF37]">🔥 Melhor oportunidade encontrada</p>
+              <h2 className="mt-3 text-5xl font-black text-white">{formatCurrency(bestPrice)}</h2>
+              {averagePrice > 0 && <p className="mt-2 text-[#CBD5E1]">Média encontrada: {formatCurrency(averagePrice)}</p>}
+              <p className="mt-2 font-semibold text-[#CBD5E1]">{search.origin} → {search.destination} • Saída {search.departureDate}</p>
+              <div className="mt-7 flex flex-col gap-3 sm:flex-row">
+                <button onClick={() => setSelectedFlight(bestFlight)} className="rounded-2xl bg-gradient-to-r from-[#D4AF37] to-[#F5C542] px-6 py-4 font-black text-[#020817] shadow-lg shadow-[#D4AF37]/20">
+                  🔔 Ser avisado quando baixar
+                </button>
+                <a href={buildWhatsAppLink(bestFlight, search)} target="_blank" rel="noreferrer" className="rounded-2xl bg-green-600 px-6 py-4 text-center font-black text-white shadow-lg shadow-green-900/20">
+                  💬 Falar com especialista agora
+                </a>
+              </div>
+            </div>
 
-function Field({ label, value, onChange, placeholder }) {
-  return (
-    <label className="space-y-1 text-sm font-bold">{label}
-      <input value={value} placeholder={placeholder} onChange={(e) => onChange(e.target.value.toUpperCase())} className="w-full rounded-xl border border-slate-200 px-3 py-3 outline-none focus:border-blue-600" />
-    </label>
-  );
-}
+            <div className="rounded-[2rem] border border-[#D4AF37]/30 bg-gradient-to-br from-[#111827] to-[#020617] p-7 text-center shadow-2xl shadow-black/50">
+              <div className="mx-auto mb-4 w-fit rounded-full bg-[#E53935]/15 px-4 py-2 text-sm font-black text-red-200">
+                ⚠️ Atenção: esse preço pode subir
+              </div>
+              <h3 className="text-2xl font-black text-white">Não perca essa oportunidade</h3>
+              <PriceGauge percent={riskPercent} />
+              <p className="mx-auto mb-5 max-w-sm text-sm leading-6 text-[#CBD5E1]">
+                Quando o sistema identifica risco de alta, o melhor movimento é criar um alerta ou falar com um especialista antes que a tarifa mude.
+              </p>
+              <button onClick={() => setSelectedFlight(bestFlight)} className="w-full rounded-2xl bg-gradient-to-r from-[#D4AF37] to-[#F5C542] px-5 py-4 font-black text-[#020817] shadow-lg shadow-[#D4AF37]/20">
+                🔔 Criar alerta grátis agora
+              </button>
+              <a href={buildWhatsAppLink(bestFlight, search)} target="_blank" rel="noreferrer" className="mt-3 block w-full rounded-2xl bg-green-600 px-5 py-4 font-black text-white">
+                💬 Garantir com a Redwood
+              </a>
+            </div>
+          </div>
+        )}
 
-function DateField({ label, value, onChange }) {
-  return (
-    <label className="space-y-1 text-sm font-bold">{label}
-      <input type="date" value={value} onChange={(e) => onChange(e.target.value)} className="w-full rounded-xl border border-slate-200 px-3 py-3 outline-none focus:border-blue-600" />
-    </label>
-  );
-}
+        <div className="mt-12">
+          <h2 className="mb-6 text-3xl font-black text-white">Voos encontrados</h2>
+          {!flights.length && !loading && (
+            <div className="rounded-[2rem] border border-[#D4AF37]/20 bg-[#020617]/80 p-8 text-[#CBD5E1]">
+              Faça uma busca para visualizar as oportunidades disponíveis.
+            </div>
+          )}
+          <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+            {flights.map((flight, index) => (
+              <FlightCard key={flight?.id || index} flight={flight} search={search} onAlert={setSelectedFlight} />
+            ))}
+          </div>
+        </div>
+      </section>
 
-function Input({ label, value, onChange, placeholder, required }) {
-  return (
-    <label className="space-y-1 text-sm font-bold">{label}
-      <input required={required} value={value} placeholder={placeholder} onChange={(e) => onChange(e.target.value)} className="w-full rounded-xl border border-white/10 bg-white/10 px-3 py-3 text-white outline-none placeholder:text-slate-400 focus:border-yellow-400" />
-    </label>
+      {selectedFlight && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
+          <form onSubmit={handleCreateAlert} className="w-full max-w-lg rounded-[2rem] border border-[#D4AF37]/30 bg-[#020617] p-7 shadow-2xl">
+            <div className="mb-5 flex items-start justify-between gap-4">
+              <div>
+                <p className="text-sm font-black uppercase tracking-[0.25em] text-[#D4AF37]">Alerta Redwood</p>
+                <h3 className="mt-2 text-3xl font-black text-white">Ser avisado quando baixar</h3>
+                <p className="mt-2 text-sm text-[#CBD5E1]">Informe seus dados para a Redwood acompanhar essa oportunidade.</p>
+              </div>
+              <button type="button" onClick={() => setSelectedFlight(null)} className="rounded-full border border-white/10 px-3 py-2 text-white">✕</button>
+            </div>
+
+            <div className="space-y-4">
+              <input required placeholder="Seu nome" value={alertForm.name} onChange={(e) => setAlertForm({ ...alertForm, name: e.target.value })} className="w-full rounded-2xl border border-[#D4AF37]/20 bg-white/95 px-4 py-3 font-bold text-[#020817] outline-none focus:ring-2 focus:ring-[#D4AF37]" />
+              <input required placeholder="WhatsApp com DDD" value={alertForm.whatsapp} onChange={(e) => setAlertForm({ ...alertForm, whatsapp: e.target.value })} className="w-full rounded-2xl border border-[#D4AF37]/20 bg-white/95 px-4 py-3 font-bold text-[#020817] outline-none focus:ring-2 focus:ring-[#D4AF37]" />
+              <input placeholder="Preço desejado" type="number" value={alertForm.targetPrice} onChange={(e) => setAlertForm({ ...alertForm, targetPrice: e.target.value })} className="w-full rounded-2xl border border-[#D4AF37]/20 bg-white/95 px-4 py-3 font-bold text-[#020817] outline-none focus:ring-2 focus:ring-[#D4AF37]" />
+            </div>
+
+            <button className="mt-6 w-full rounded-2xl bg-gradient-to-r from-[#D4AF37] to-[#F5C542] px-5 py-4 font-black text-[#020817] shadow-lg shadow-[#D4AF37]/20">
+              🔔 Criar alerta de preço grátis
+            </button>
+            {alertStatus && <p className="mt-4 rounded-2xl border border-white/10 bg-white/5 p-3 text-sm font-bold text-[#CBD5E1]">{alertStatus}</p>}
+          </form>
+        </div>
+      )}
+    </main>
   );
 }
