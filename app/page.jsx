@@ -3,6 +3,8 @@
 import { useState } from "react";
 
 const API_URL = "https://redwood-backend-production.up.railway.app";
+const WHATSAPP = "5599999999999";
+const REDWOOD_RED = "#e42320";
 
 export default function Home() {
   const [origem, setOrigem] = useState("POA");
@@ -68,26 +70,49 @@ export default function Home() {
   }
 
   function Gauge({ value }) {
+    const safeValue = Math.min(Math.max(value, 0), 100);
+
     return (
-      <div className="relative w-44 h-24 overflow-hidden">
-        <div className="absolute inset-x-0 bottom-0 h-44 rounded-full border-[22px] border-gray-200"></div>
+      <div className="w-48">
+        <svg viewBox="0 0 200 115" className="w-full h-auto">
+          <path
+            d="M 25 95 A 75 75 0 0 1 175 95"
+            fill="none"
+            stroke="#e5e7eb"
+            strokeWidth="24"
+            strokeLinecap="butt"
+            pathLength="100"
+          />
 
-        <div
-          className="absolute inset-x-0 bottom-0 h-44 rounded-full border-[22px] border-green-500"
-          style={{
-            clipPath: "inset(0 0 50% 0)",
-            transform: `rotate(${value * 1.8 - 90}deg)`,
-          }}
-        ></div>
+          <path
+            d="M 25 95 A 75 75 0 0 1 175 95"
+            fill="none"
+            stroke="#4ade00"
+            strokeWidth="24"
+            strokeLinecap="butt"
+            pathLength="100"
+            strokeDasharray={`${safeValue} 100`}
+          />
 
-        <div className="absolute bottom-0 left-1/2 -translate-x-1/2 text-center">
-          <p className="text-2xl font-bold text-black">{value}%</p>
-        </div>
+          <text
+            x="100"
+            y="88"
+            textAnchor="middle"
+            fontSize="22"
+            fontWeight="700"
+            fill="#000"
+          >
+            {safeValue}%
+          </text>
 
-        <span className="absolute bottom-0 left-0 text-xs text-gray-400">0</span>
-        <span className="absolute bottom-0 right-0 text-xs text-gray-400">
-          100
-        </span>
+          <text x="22" y="112" fontSize="11" fill="#9ca3af">
+            0
+          </text>
+
+          <text x="166" y="112" fontSize="11" fill="#9ca3af">
+            100
+          </text>
+        </svg>
       </div>
     );
   }
@@ -96,9 +121,11 @@ export default function Home() {
     <main className="min-h-screen bg-[#07111f] text-white">
       <section className="grid grid-cols-1 lg:grid-cols-2 gap-12 px-8 lg:px-24 py-16">
         <div>
-          <p className="text-yellow-400 tracking-[0.4em] text-sm mb-8">
-            REDWOOD VIAGENS
-          </p>
+          <img
+            src="/logo-redwood.png"
+            alt="Redwood Viagens"
+            className="w-56 mb-10"
+          />
 
           <h1 className="text-5xl lg:text-7xl font-serif leading-tight">
             Viaje com economia,{" "}
@@ -224,8 +251,18 @@ export default function Home() {
                 </div>
 
                 <div className="px-6 py-5 border-b flex items-center gap-5">
-                  <div className="w-24 h-12 bg-[#24126a] text-white rounded flex items-center justify-center text-xs font-bold text-center">
-                    {voo.airline?.slice(0, 12) || "Cia Aérea"}
+                  <div className="w-24 h-14 bg-[#24126a] rounded flex items-center justify-center p-2">
+                    {voo.airlineLogo ? (
+                      <img
+                        src={voo.airlineLogo}
+                        alt={voo.airline || "Companhia aérea"}
+                        className="max-w-full max-h-full object-contain"
+                      />
+                    ) : (
+                      <span className="text-white text-xs font-bold text-center">
+                        {voo.airline?.slice(0, 12) || "Cia Aérea"}
+                      </span>
+                    )}
                   </div>
 
                   <div>
@@ -275,14 +312,17 @@ export default function Home() {
 
                   <div className="mt-8 flex flex-wrap gap-3">
                     <a
-                      href={`https://wa.me/5599999999999?text=Olá, quero reservar essa passagem ${voo.origin} para ${voo.destination} por ${voo.priceText}`}
+                      href={`https://wa.me/${WHATSAPP}?text=Olá, quero reservar essa passagem ${voo.origin} para ${voo.destination} por ${voo.priceText}`}
                       target="_blank"
                       className="bg-blue-600 text-white px-5 py-3 rounded font-bold"
                     >
                       ✔ Reservar agora
                     </a>
 
-                    <button className="bg-blue-500 text-white px-5 py-3 rounded font-bold">
+                    <button
+                      style={{ backgroundColor: REDWOOD_RED }}
+                      className="text-white px-5 py-3 rounded font-bold hover:opacity-90"
+                    >
                       🔔 Criar alerta de preço
                     </button>
                   </div>
