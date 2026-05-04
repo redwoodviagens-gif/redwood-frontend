@@ -165,13 +165,15 @@ export default function Page() {
 
   const updateForm = (field, value) => setForm((prev) => ({ ...prev, [field]: value }));
 
-  const searchPayload = {
-    origin: form.origin.trim().toUpperCase(),
-    destination: form.destination.trim().toUpperCase(),
-    departureDate: form.departureDate,
-    returnDate: form.returnDate,
-    passengers: Number(form.passengers || 1),
-  };
+ const searchPayload = {
+  origin: form.origin.trim().toUpperCase(),
+  destination: form.destination.trim().toUpperCase(),
+  departureDate: form.departureDate,
+  returnDate: form.returnDate,
+  passengers: Number(form.passengers || 1),
+  adults: Number(form.passengers || 1),
+  provider: "duffel",
+};
 
   const handleSearch = async (event) => {
     event.preventDefault();
