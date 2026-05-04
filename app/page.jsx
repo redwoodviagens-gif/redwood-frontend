@@ -228,7 +228,7 @@ export default function Home() {
                       style={{ backgroundColor: REDWOOD_RED }}
                       className="text-white px-4 py-3 rounded font-bold"
                     >
-                      🔔 Alerta
+                      🔔 Quero ser avisado quando baixar
                     </a>
 
                   </div>
