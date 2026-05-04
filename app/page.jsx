@@ -118,7 +118,7 @@ export default function Home() {
   }
 
   return (
-    <main className="min-h-screen bg-[#07111f] text-white">
+    <main className="min-h-screen bg-[#031B34] text-white">
       <section className="grid grid-cols-1 lg:grid-cols-2 gap-12 px-8 lg:px-24 py-16">
         <div>
           <img
@@ -141,7 +141,7 @@ export default function Home() {
 
         <form
           onSubmit={buscarVoos}
-          className="bg-[#030918] border border-yellow-500/40 rounded-3xl p-8 shadow-2xl"
+          className="bg-[#020F1F] border border-yellow-500/40 rounded-3xl p-8 shadow-2xl"
         >
           <p className="text-yellow-400 tracking-[0.4em] text-xs mb-4">
             BUSCA INTELIGENTE
