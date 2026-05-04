@@ -46,16 +46,52 @@ export default function Home() {
 
       setResultados(Array.isArray(data.flights) ? data.flights : []);
     } catch (error) {
-      console.error("ERRO NO FRONT:", error);
+      console.error(error);
       setErro("Não foi possível buscar voos agora. Tente novamente.");
     } finally {
       setLoading(false);
     }
   }
 
+  function formatarData(data) {
+    if (!data) return "";
+    const [ano, mes, dia] = data.split("-");
+    return `${dia}/${mes}/${ano}`;
+  }
+
+  function calcularProbabilidade(voo) {
+    const preco = Number(voo.price || 0);
+    if (preco <= 120) return 83;
+    if (preco <= 180) return 71;
+    if (preco <= 250) return 58;
+    return 42;
+  }
+
+  function Gauge({ value }) {
+    const rotation = Math.min(Math.max(value, 0), 100) * 1.8 - 90;
+
+    return (
+      <div className="relative w-44 h-24 overflow-hidden">
+        <div className="absolute inset-x-0 bottom-0 h-44 rounded-full border-[22px] border-gray-200"></div>
+        <div
+          className="absolute inset-x-0 bottom-0 h-44 rounded-full border-[22px] border-green-500"
+          style={{
+            clipPath: "inset(0 0 50% 0)",
+            transform: `rotate(${rotation}deg)`,
+          }}
+        ></div>
+        <div className="absolute bottom-0 left-1/2 -translate-x-1/2 text-center">
+          <p className="text-2xl font-bold text-black">{value}%</p>
+        </div>
+        <span className="absolute bottom-0 left-0 text-xs text-gray-400">0</span>
+        <span className="absolute bottom-0 right-0 text-xs text-gray-400">100</span>
+      </div>
+    );
+  }
+
   return (
     <main className="min-h-screen bg-[#07111f] text-white">
-      <section className="grid grid-cols-1 lg:grid-cols-2 gap-12 px-8 lg:px-24 py-20">
+      <section className="grid grid-cols-1 lg:grid-cols-2 gap-12 px-8 lg:px-24 py-16">
         <div>
           <p className="text-yellow-400 tracking-[0.4em] text-sm mb-8">
             REDWOOD VIAGENS
@@ -82,12 +118,9 @@ export default function Home() {
           </p>
 
           <h2 className="text-3xl font-bold mb-2">Pesquisar passagem</h2>
-          <p className="text-sm text-gray-300 mb-8">
-            Use aeroportos IATA: POA, GIG, GRU, SDU, MCZ, MAO, LIS.
-          </p>
 
-          <div className="grid grid-cols-2 gap-4">
-            <label>
+          <div className="grid grid-cols-2 gap-4 mt-8">
+            <label className="text-sm">
               Origem (IATA)
               <input
                 value={origem}
@@ -96,7 +129,7 @@ export default function Home() {
               />
             </label>
 
-            <label>
+            <label className="text-sm">
               Destino (IATA)
               <input
                 value={destino}
@@ -105,7 +138,7 @@ export default function Home() {
               />
             </label>
 
-            <label>
+            <label className="text-sm">
               Ida
               <input
                 type="date"
@@ -115,7 +148,7 @@ export default function Home() {
               />
             </label>
 
-            <label>
+            <label className="text-sm">
               Volta
               <input
                 type="date"
@@ -126,7 +159,7 @@ export default function Home() {
             </label>
           </div>
 
-          <label className="block mt-4">
+          <label className="block mt-4 text-sm">
             Passageiros
             <input
               type="number"
@@ -148,60 +181,107 @@ export default function Home() {
         </form>
       </section>
 
-      <section className="px-8 lg:px-24 py-12 border-t border-red-700/40">
-        <p className="text-yellow-400 tracking-[0.4em] text-xs mb-4">
+      <section className="bg-[#f3f6f9] text-black px-6 lg:px-24 py-12">
+        <p className="text-yellow-600 tracking-[0.4em] text-xs mb-3">
           RESULTADOS
         </p>
 
-        <h2 className="text-3xl font-bold mb-8">Voos encontrados</h2>
+        <h2 className="text-3xl font-bold mb-8 text-[#07111f]">
+          Voos encontrados
+        </h2>
 
         {resultados.length === 0 && !loading && (
-          <div className="border border-yellow-500/30 rounded-2xl p-8 text-blue-100">
+          <div className="bg-white border rounded-xl p-8 text-gray-600">
             Faça uma busca para visualizar as oportunidades disponíveis.
           </div>
         )}
 
-        <div className="grid gap-6">
-          {resultados.map((voo) => (
-            <div
-              key={voo.id}
-              className="bg-[#030918] border border-yellow-500/30 rounded-2xl p-6"
-            >
-              <div className="flex justify-between gap-6 flex-wrap">
-                <div>
-                  <h3 className="text-2xl font-bold">
-                    {voo.airline || "Companhia aérea"}
-                  </h3>
+        <div className="grid gap-8 max-w-3xl">
+          {resultados.map((voo) => {
+            const probabilidade = calcularProbabilidade(voo);
 
-                  <p className="text-blue-100 mt-2">
-                    {voo.origin} → {voo.destination}
-                  </p>
-
-                  <p className="text-sm text-gray-400 mt-2">
-                    Duração: {voo.duration || "Não informado"} |{" "}
-                    {voo.stops === 0
-                      ? "Voo direto"
-                      : `${voo.stops} parada(s)`}
-                  </p>
+            return (
+              <div
+                key={voo.id}
+                className="bg-white border border-gray-300 rounded-xl shadow-md overflow-hidden"
+              >
+                <div className="bg-gray-100 px-6 py-5 border-b flex justify-between items-center">
+                  <div>
+                    <p className="text-lg font-semibold text-[#0b2545]">
+                      {voo.origin} → {voo.destination}
+                    </p>
+                    <p className="text-sm text-gray-500">
+                      {formatarData(dataIda)} {dataVolta && `- ${formatarData(dataVolta)}`}
+                    </p>
+                  </div>
+                  <span className="text-gray-500">⌄</span>
                 </div>
 
-                <div className="text-right">
-                  <p className="text-sm text-gray-400">A partir de</p>
-                  <p className="text-3xl font-bold text-yellow-400">
+                <div className="px-6 py-5 border-b flex items-center gap-5">
+                  <div className="w-20 h-12 bg-[#24126a] text-white rounded flex items-center justify-center text-xs font-bold">
+                    {voo.airline?.slice(0, 10)}
+                  </div>
+
+                  <div>
+                    <p className="text-xl font-bold text-[#07111f]">
+                      {voo.departureTime
+                        ? new Date(voo.departureTime).toLocaleTimeString("pt-BR", {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })
+                        : "--:--"}{" "}
+                      -{" "}
+                      {voo.arrivalTime
+                        ? new Date(voo.arrivalTime).toLocaleTimeString("pt-BR", {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })
+                        : "--:--"}
+                    </p>
+
+                    <p className="text-base text-[#07111f]">
+                      {voo.origin}-{voo.destination}{" "}
+                      {voo.stops === 0
+                        ? "Direto"
+                        : `${voo.stops} escala(s)`}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="px-6 py-6">
+                  <p className="text-3xl font-light mb-2">
                     {voo.priceText}
                   </p>
 
-                  <a
-                    href={`https://wa.me/55${process.env.NEXT_PUBLIC_WHATSAPP_PHONE || "5599999999999"}?text=Olá, quero cotar essa passagem ${voo.origin} para ${voo.destination} por ${voo.priceText}`}
-                    target="_blank"
-                    className="inline-block mt-4 bg-green-500 text-black font-bold px-5 py-3 rounded-xl"
-                  >
-                    Chamar no WhatsApp
-                  </a>
+                  <div className="inline-block bg-cyan-400 text-white font-bold px-4 py-2 rounded mb-2">
+                    Espere, o preço pode descer
+                  </div>
+
+                  <span className="ml-2 text-sm text-blue-600">Por quê?</span>
+
+                  <p className="font-bold mt-6 mb-3">
+                    Probabilidade de descida
+                  </p>
+
+                  <Gauge value={probabilidade} />
+
+                  <div className="mt-8 flex flex-wrap gap-3">
+                    <a
+                      href={`https://wa.me/5599999999999?text=Olá, quero reservar essa passagem ${voo.origin} para ${voo.destination} por ${voo.priceText}`}
+                      target="_blank"
+                      className="bg-blue-600 text-white px-5 py-3 rounded font-bold"
+                    >
+                      ✔ Reservar agora
+                    </a>
+
+                    <button className="bg-blue-500 text-white px-5 py-3 rounded font-bold">
+                      🔔 Criar alerta de preço
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </section>
     </main>
