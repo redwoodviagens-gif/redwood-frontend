@@ -5,6 +5,7 @@ import { useState } from "react";
 const API_URL = "https://redwood-backend-production.up.railway.app";
 const WHATSAPP = "5599999999999";
 const REDWOOD_RED = "#e42320";
+const DOLAR_FIXO = 5.4;
 
 export default function Home() {
   const [origem, setOrigem] = useState("POA");
@@ -61,12 +62,28 @@ export default function Home() {
     return `${dia}/${mes}/${ano}`;
   }
 
+  function converterParaBRL(valorUSD) {
+    const valor = Number(valorUSD || 0) * DOLAR_FIXO;
+
+    return valor.toLocaleString("pt-BR", {
+      style: "currency",
+      currency: "BRL",
+    });
+  }
+
   function calcularProbabilidade(voo) {
     const preco = Number(voo.price || 0);
+
     if (preco <= 120) return 83;
     if (preco <= 180) return 71;
     if (preco <= 250) return 58;
     return 42;
+  }
+
+  function textoAlerta(probabilidade) {
+    if (probabilidade >= 70) return "🔥 Espere, o preço pode cair";
+    if (probabilidade >= 50) return "⚠️ Fique atento, pode variar";
+    return "🚀 Boa oportunidade para comprar";
   }
 
   function Gauge({ value }) {
@@ -296,10 +313,16 @@ export default function Home() {
                 </div>
 
                 <div className="px-6 py-6 flex-1">
-                  <p className="text-3xl font-light mb-3">{voo.priceText}</p>
+                  <p className="text-3xl font-bold text-[#07111f] mb-1">
+                    {converterParaBRL(voo.price)}
+                  </p>
+
+                  <p className="text-sm text-gray-500 mb-3">
+                    Valor original: {voo.priceText}
+                  </p>
 
                   <div className="inline-block bg-cyan-400 text-white font-bold px-4 py-2 rounded mb-2">
-                    Espere, o preço pode descer
+                    {textoAlerta(probabilidade)}
                   </div>
 
                   <span className="ml-2 text-sm text-blue-600">Por quê?</span>
@@ -312,19 +335,27 @@ export default function Home() {
 
                   <div className="mt-8 flex flex-wrap gap-3">
                     <a
-                      href={`https://wa.me/${WHATSAPP}?text=Olá, quero reservar essa passagem ${voo.origin} para ${voo.destination} por ${voo.priceText}`}
+                      href={`https://wa.me/${WHATSAPP}?text=Olá, quero reservar essa passagem ${voo.origin} para ${voo.destination} por ${converterParaBRL(
+                        voo.price
+                      )}. Valor original: ${voo.priceText}`}
                       target="_blank"
                       className="bg-blue-600 text-white px-5 py-3 rounded font-bold"
                     >
                       ✔ Reservar agora
                     </a>
 
-                    <button
+                    <a
+                      href={`https://wa.me/${WHATSAPP}?text=Quero criar alerta de preço para voo ${voo.origin} → ${voo.destination} em ${formatarData(
+                        dataIda
+                      )}. Me avise quando baixar. Valor atual: ${converterParaBRL(
+                        voo.price
+                      )}`}
+                      target="_blank"
                       style={{ backgroundColor: REDWOOD_RED }}
                       className="text-white px-5 py-3 rounded font-bold hover:opacity-90"
                     >
                       🔔 Criar alerta de preço
-                    </button>
+                    </a>
                   </div>
                 </div>
               </div>
