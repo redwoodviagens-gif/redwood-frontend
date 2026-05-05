@@ -69,6 +69,7 @@ export default function Home() {
 
   function converterParaBRL(valorUSD) {
     const valor = Number(valorUSD || 0) * DOLAR_FIXO;
+
     return valor.toLocaleString("pt-BR", {
       style: "currency",
       currency: "BRL",
@@ -81,6 +82,7 @@ export default function Home() {
 
   function calcularProbabilidade(voo) {
     const preco = Number(voo.price || 0);
+
     if (preco <= 120) return 83;
     if (preco <= 180) return 71;
     if (preco <= 250) return 58;
@@ -123,8 +125,8 @@ export default function Home() {
     return texto.replace(/[🟢🟡🔴]/g, "").trim();
   }
 
-  function abrirModalAlerta(voo, decisao, mensagemAlerta) {
-    setVooSelecionado({ voo, decisao, mensagemAlerta });
+  function abrirModalAlerta(voo, decisao) {
+    setVooSelecionado({ voo, decisao });
     setLeadNome("");
     setLeadWhatsapp("");
     setLeadEmail("");
@@ -141,12 +143,12 @@ export default function Home() {
         return;
       }
 
-      const { voo, decisao, mensagemAlerta } = vooSelecionado;
+      const { voo, decisao } = vooSelecionado;
 
       await fetch(`${API_URL}/api/price-alerts`, {
         method: "POST",
         headers: {
-          "Content-Type": "application/json"
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           nome: leadNome,
@@ -166,18 +168,38 @@ export default function Home() {
           horarioVolta: voo.arrivalTime || "",
           offerId: voo.id,
           provider: "duffel",
-          observacoes: `Alerta criado pelo site Redwood Viagens. Recomendação: ${limparRecomendacao(decisao.texto)}`,
+          observacoes: `Alerta criado pelo site Redwood Viagens. Recomendação: ${limparRecomendacao(
+            decisao.texto
+          )}`,
           campanha: "site-redwood",
-          raw: voo
-        })
+          raw: voo,
+        }),
       });
+
+      const mensagemWhatsApp = encodeURIComponent(
+        `Olá! Quero criar um alerta de preço na Redwood Viagens:
+
+👤 Nome: ${leadNome}
+📲 WhatsApp do cliente: ${leadWhatsapp}
+📧 Email: ${leadEmail || "Não informado"}
+
+✈️ Trecho: ${voo.origin} → ${voo.destination}
+📅 Ida: ${formatarData(dataIda)}
+📅 Volta: ${dataVolta ? formatarData(dataVolta) : "Não informada"}
+👥 Passageiros: ${adultos}
+
+💰 Valor atual: ${converterParaBRL(voo.price)}
+🎯 Preço desejado: ${
+          precoDesejado ? `R$ ${precoDesejado}` : "Não informado"
+        }
+📊 Recomendação atual: ${limparRecomendacao(decisao.texto)}
+
+Pode me avisar quando esse preço baixar?`
+      );
 
       setModalAberto(false);
 
-      window.open(
-        `https://wa.me/${WHATSAPP}?text=${mensagemAlerta}`,
-        "_blank"
-      );
+      window.open(`https://wa.me/${WHATSAPP}?text=${mensagemWhatsApp}`, "_blank");
     } catch (error) {
       console.error("Erro ao salvar alerta:", error);
       alert("Não foi possível criar o alerta agora. Tente novamente.");
@@ -240,10 +262,18 @@ export default function Home() {
           />
 
           <nav className="hidden md:flex items-center gap-8 text-sm text-blue-100">
-            <a href="#" className="hover:text-yellow-400">Passagens</a>
-            <a href="#" className="hover:text-yellow-400">Pacotes</a>
-            <a href="#" className="hover:text-yellow-400">Seguros</a>
-            <a href="#" className="hover:text-yellow-400">Atendimento</a>
+            <a href="#" className="hover:text-yellow-400">
+              Passagens
+            </a>
+            <a href="#" className="hover:text-yellow-400">
+              Pacotes
+            </a>
+            <a href="#" className="hover:text-yellow-400">
+              Seguros
+            </a>
+            <a href="#" className="hover:text-yellow-400">
+              Atendimento
+            </a>
           </nav>
 
           <a
@@ -361,17 +391,6 @@ export default function Home() {
 Pode me ajudar a confirmar disponibilidade e emitir?`
             );
 
-            const mensagemAlerta = encodeURIComponent(
-              `Olá! Quero criar um alerta de preço na Redwood Viagens:
-
-✈️ Trecho: ${voo.origin} → ${voo.destination}
-📅 Data desejada: ${formatarData(dataIda)}
-💰 Valor atual: ${converterParaBRL(voo.price)}
-📊 Recomendação atual: ${limparRecomendacao(decisao.texto)}
-
-Pode me avisar quando esse preço baixar?`
-            );
-
             return (
               <div
                 key={voo.id}
@@ -466,7 +485,7 @@ Pode me avisar quando esse preço baixar?`
                     </a>
 
                     <button
-                      onClick={() => abrirModalAlerta(voo, decisao, mensagemAlerta)}
+                      onClick={() => abrirModalAlerta(voo, decisao)}
                       style={{ backgroundColor: REDWOOD_RED }}
                       className="text-white px-4 py-3 rounded font-bold"
                     >
@@ -488,7 +507,8 @@ Pode me avisar quando esse preço baixar?`
             </h2>
 
             <p className="text-sm text-gray-600 mb-5">
-              Preencha seus dados para a Redwood avisar quando aparecer uma melhor oportunidade.
+              Preencha seus dados para a Redwood avisar quando aparecer uma
+              melhor oportunidade.
             </p>
 
             <input
