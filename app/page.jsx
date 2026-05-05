@@ -3,7 +3,7 @@
 import { useState } from "react";
 
 const API_URL = "https://redwood-backend-production.up.railway.app";
-const WHATSAPP = "5599999999999";
+const WHATSAPP = "55992290849";
 const REDWOOD_RED = "#e42320";
 const DOLAR_FIXO = 5.4;
 
@@ -68,6 +68,10 @@ export default function Home() {
     });
   }
 
+  function calcularPrecoBRLNumero(valorUSD) {
+    return Number((Number(valorUSD || 0) * DOLAR_FIXO).toFixed(2));
+  }
+
   function calcularProbabilidade(voo) {
     const preco = Number(voo.price || 0);
     if (preco <= 120) return 83;
@@ -110,6 +114,47 @@ export default function Home() {
 
   function limparRecomendacao(texto) {
     return texto.replace(/[🟢🟡🔴]/g, "").trim();
+  }
+
+  async function criarAlertaPreco(voo, decisao, mensagemAlerta) {
+    try {
+      await fetch(`${API_URL}/api/price-alerts`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          nome: "Lead Site",
+          whatsapp: "lead-site",
+          email: "",
+          origem: voo.origin,
+          destino: voo.destination,
+          dataIda: dataIda,
+          dataVolta: dataVolta,
+          passageiros: Number(adultos || 1),
+          precoAtual: calcularPrecoBRLNumero(voo.price),
+          moeda: "BRL",
+          precoDesejado: null,
+          companhia: voo.airline || "",
+          codigoCompanhia: "",
+          horarioIda: voo.departureTime || "",
+          horarioVolta: voo.arrivalTime || "",
+          offerId: voo.id,
+          provider: "duffel",
+          observacoes: `Alerta criado pelo site Redwood Viagens. Recomendação: ${limparRecomendacao(decisao.texto)}`,
+          campanha: "site-redwood",
+          raw: voo
+        })
+      });
+
+      window.open(
+        `https://wa.me/${WHATSAPP}?text=${mensagemAlerta}`,
+        "_blank"
+      );
+    } catch (error) {
+      console.error("Erro ao criar alerta:", error);
+      alert("Não foi possível criar o alerta agora. Tente novamente.");
+    }
   }
 
   function Gauge({ value }) {
@@ -393,14 +438,13 @@ Pode me avisar quando esse preço baixar?`
                       Reservar
                     </a>
 
-                    <a
-                      href={`https://wa.me/${WHATSAPP}?text=${mensagemAlerta}`}
-                      target="_blank"
+                    <button
+                      onClick={() => criarAlertaPreco(voo, decisao, mensagemAlerta)}
                       style={{ backgroundColor: REDWOOD_RED }}
                       className="text-white px-4 py-3 rounded font-bold"
                     >
                       🔔 Criar Alerta de Preço
-                    </a>
+                    </button>
                   </div>
                 </div>
               </div>
