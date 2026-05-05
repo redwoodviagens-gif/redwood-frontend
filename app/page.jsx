@@ -17,6 +17,13 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [erro, setErro] = useState("");
 
+  const [modalAberto, setModalAberto] = useState(false);
+  const [vooSelecionado, setVooSelecionado] = useState(null);
+  const [leadNome, setLeadNome] = useState("");
+  const [leadWhatsapp, setLeadWhatsapp] = useState("");
+  const [leadEmail, setLeadEmail] = useState("");
+  const [precoDesejado, setPrecoDesejado] = useState("");
+
   async function buscarVoos(e) {
     e.preventDefault();
 
@@ -116,17 +123,35 @@ export default function Home() {
     return texto.replace(/[🟢🟡🔴]/g, "").trim();
   }
 
-  async function criarAlertaPreco(voo, decisao, mensagemAlerta) {
+  function abrirModalAlerta(voo, decisao, mensagemAlerta) {
+    setVooSelecionado({ voo, decisao, mensagemAlerta });
+    setLeadNome("");
+    setLeadWhatsapp("");
+    setLeadEmail("");
+    setPrecoDesejado("");
+    setModalAberto(true);
+  }
+
+  async function salvarAlertaComLead() {
     try {
+      if (!vooSelecionado) return;
+
+      if (!leadNome || !leadWhatsapp) {
+        alert("Preencha nome e WhatsApp para criar o alerta.");
+        return;
+      }
+
+      const { voo, decisao, mensagemAlerta } = vooSelecionado;
+
       await fetch(`${API_URL}/api/price-alerts`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
-          nome: "Lead Site",
-          whatsapp: "lead-site",
-          email: "",
+          nome: leadNome,
+          whatsapp: leadWhatsapp,
+          email: leadEmail,
           origem: voo.origin,
           destino: voo.destination,
           dataIda: dataIda,
@@ -134,7 +159,7 @@ export default function Home() {
           passageiros: Number(adultos || 1),
           precoAtual: calcularPrecoBRLNumero(voo.price),
           moeda: "BRL",
-          precoDesejado: null,
+          precoDesejado: precoDesejado ? Number(precoDesejado) : null,
           companhia: voo.airline || "",
           codigoCompanhia: "",
           horarioIda: voo.departureTime || "",
@@ -147,12 +172,14 @@ export default function Home() {
         })
       });
 
+      setModalAberto(false);
+
       window.open(
         `https://wa.me/${WHATSAPP}?text=${mensagemAlerta}`,
         "_blank"
       );
     } catch (error) {
-      console.error("Erro ao criar alerta:", error);
+      console.error("Erro ao salvar alerta:", error);
       alert("Não foi possível criar o alerta agora. Tente novamente.");
     }
   }
@@ -439,7 +466,7 @@ Pode me avisar quando esse preço baixar?`
                     </a>
 
                     <button
-                      onClick={() => criarAlertaPreco(voo, decisao, mensagemAlerta)}
+                      onClick={() => abrirModalAlerta(voo, decisao, mensagemAlerta)}
                       style={{ backgroundColor: REDWOOD_RED }}
                       className="text-white px-4 py-3 rounded font-bold"
                     >
@@ -452,6 +479,65 @@ Pode me avisar quando esse preço baixar?`
           })}
         </div>
       </section>
+
+      {modalAberto && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[999] px-4">
+          <div className="bg-white text-black p-6 rounded-2xl w-full max-w-md shadow-2xl">
+            <h2 className="text-2xl font-bold mb-2 text-[#031B34]">
+              Criar alerta de preço
+            </h2>
+
+            <p className="text-sm text-gray-600 mb-5">
+              Preencha seus dados para a Redwood avisar quando aparecer uma melhor oportunidade.
+            </p>
+
+            <input
+              placeholder="Seu nome"
+              value={leadNome}
+              onChange={(e) => setLeadNome(e.target.value)}
+              className="w-full p-3 border rounded-xl mb-3"
+            />
+
+            <input
+              placeholder="WhatsApp com DDD"
+              value={leadWhatsapp}
+              onChange={(e) => setLeadWhatsapp(e.target.value)}
+              className="w-full p-3 border rounded-xl mb-3"
+            />
+
+            <input
+              placeholder="Email (opcional)"
+              value={leadEmail}
+              onChange={(e) => setLeadEmail(e.target.value)}
+              className="w-full p-3 border rounded-xl mb-3"
+            />
+
+            <input
+              placeholder="Preço desejado em R$ (opcional)"
+              value={precoDesejado}
+              onChange={(e) => setPrecoDesejado(e.target.value)}
+              className="w-full p-3 border rounded-xl mb-5"
+            />
+
+            <div className="flex gap-3">
+              <button
+                onClick={salvarAlertaComLead}
+                style={{ backgroundColor: REDWOOD_RED }}
+                className="text-white px-4 py-3 rounded-xl font-bold w-full"
+              >
+                Salvar alerta
+              </button>
+
+              <button
+                onClick={() => setModalAberto(false)}
+                className="bg-gray-200 px-4 py-3 rounded-xl font-bold w-full"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
