@@ -84,45 +84,59 @@ export default function Home() {
     const preco = Number(voo.price || 0);
 
     if (preco <= 120) return 83;
-    if (preco <= 180) return 71;
-    if (preco <= 250) return 58;
-    return 42;
-  }
-
-  function textoAlerta(probabilidade) {
-    if (probabilidade >= 70) return "🔥 Espere, o preço pode cair";
-    if (probabilidade >= 50) return "⚠️ Fique atento, pode variar";
-    return "🚀 Boa oportunidade para comprar";
+    if (preco <= 180) return 65;
+    if (preco <= 250) return 48;
+    return 32;
   }
 
   function gerarDecisao(voo, probabilidade) {
     const preco = Number(voo.price || 0);
 
-    if (preco <= 120 || probabilidade <= 45) {
+    if (preco <= 120) {
       return {
+        tipo: "comprar",
         texto: "🟢 COMPRE AGORA",
         cor: "bg-green-500 text-white",
         descricao: "Boa oportunidade para emitir agora.",
+        alerta: "✅ Boa oportunidade para comprar agora",
+        alertaCor: "bg-green-500",
       };
     }
 
     if (probabilidade >= 60) {
       return {
+        tipo: "esperar",
         texto: "🟡 ESPERE",
         cor: "bg-yellow-400 text-black",
-        descricao: "Alta chance de o preço variar nos próximos dias.",
+        descricao: "Existe chance de o preço cair nos próximos dias.",
+        alerta: "🔥 Espere, o preço pode cair",
+        alertaCor: "bg-cyan-400",
+      };
+    }
+
+    if (probabilidade >= 45) {
+      return {
+        tipo: "monitorar",
+        texto: "🟠 MONITORE",
+        cor: "bg-orange-500 text-white",
+        descricao: "Preço instável. Vale acompanhar antes de decidir.",
+        alerta: "⚠️ Fique atento, pode variar",
+        alertaCor: "bg-orange-500",
       };
     }
 
     return {
+      tipo: "alto",
       texto: "🔴 PREÇO ALTO",
       cor: "bg-red-500 text-white",
       descricao: "Pode aparecer uma condição melhor depois.",
+      alerta: "🚫 Preço alto, monitore antes de comprar",
+      alertaCor: "bg-red-500",
     };
   }
 
   function limparRecomendacao(texto) {
-    return texto.replace(/[🟢🟡🔴]/g, "").trim();
+    return texto.replace(/[🟢🟡🟠🔴]/g, "").trim();
   }
 
   function abrirModalAlerta(voo, decisao) {
@@ -189,9 +203,7 @@ export default function Home() {
 👥 Passageiros: ${adultos}
 
 💰 Valor atual: ${converterParaBRL(voo.price)}
-🎯 Preço desejado: ${
-          precoDesejado ? `R$ ${precoDesejado}` : "Não informado"
-        }
+🎯 Preço desejado: ${precoDesejado ? `R$ ${precoDesejado}` : "Não informado"}
 📊 Recomendação atual: ${limparRecomendacao(decisao.texto)}
 
 Pode me avisar quando esse preço baixar?`
@@ -467,8 +479,10 @@ Pode me ajudar a confirmar disponibilidade e emitir?`
                     {converterParaBRL(voo.price)}
                   </p>
 
-                  <div className="bg-cyan-400 text-white px-4 py-2 rounded inline-block">
-                    {textoAlerta(prob)}
+                  <div
+                    className={`${decisao.alertaCor} text-white px-4 py-2 rounded inline-block`}
+                  >
+                    {decisao.alerta}
                   </div>
 
                   <p className="mt-5 font-bold">Probabilidade de descida</p>
