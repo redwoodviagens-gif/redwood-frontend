@@ -3,7 +3,8 @@
 import { useState } from "react";
 
 const API_URL =
- const API_URL = "https://redwood-backend-production.up.railway.app";
+  process.env.NEXT_PUBLIC_API_URL ||
+  "https://SEU-BACKEND-RAILWAY.up.railway.app";
 
 function formatMoney(value) {
   if (!value && value !== 0) return "R$ --";
@@ -15,12 +16,40 @@ function formatMoney(value) {
 
 function estimateAveragePrice(price) {
   const current = Number(price || 0);
-
   if (current <= 0) return 1000;
-
-  // Média estimada conservadora para comparação estatística inicial.
-  // Depois podemos trocar por histórico real da rota no banco.
   return current * 1.45;
+}
+
+function calculateFallbackProbability(price, averagePrice) {
+  const p = Number(price || 0);
+  const avg = Number(averagePrice || estimateAveragePrice(p));
+
+  if (p <= 0 || avg <= 0) return 50;
+
+  const priceIndex = p / avg;
+
+  if (priceIndex <= 0.65) return 20;
+  if (priceIndex <= 0.75) return 30;
+  if (priceIndex <= 0.95) return 45;
+  if (priceIndex <= 1.10) return 60;
+  if (priceIndex <= 1.25) return 75;
+  return 85;
+}
+
+function getValidDropProbability(flight, price, averagePrice) {
+  const raw =
+    flight.dropProbability ??
+    flight.probability ??
+    flight.drop_probability ??
+    flight.priceDropProbability;
+
+  const parsed = Number(raw);
+
+  if (!Number.isNaN(parsed) && parsed > 0) {
+    return Math.max(0, Math.min(100, parsed));
+  }
+
+  return calculateFallbackProbability(price, averagePrice);
 }
 
 function analyzeFare(currentPrice, averagePrice, dropProbability) {
@@ -55,7 +84,7 @@ function analyzeFare(currentPrice, averagePrice, dropProbability) {
   } else if (priceIndex <= 0.75 && probability > 40) {
     recommendation = "MONITORAR";
     message =
-      "Tarifa boa, mas ainda existe chance relevante de queda. Vale criar um alerta.";
+      "Tarifa boa, mas ainda existe chance relevante de queda. Vale criar um alerta antes de emitir.";
     badgeColor = "bg-yellow-500";
     buttonText = "Criar Alerta";
   } else if (priceIndex <= 1.05 && probability >= 60) {
@@ -97,13 +126,13 @@ function analyzeFare(currentPrice, averagePrice, dropProbability) {
 }
 
 function ProbabilityGauge({ probability }) {
-  const percentage = Math.max(0, Math.min(100, probability || 0));
+  const percentage = Math.max(0, Math.min(100, Number(probability || 0)));
   const rotation = (percentage / 100) * 180;
 
   let color = "#22c55e";
 
-  if (percentage >= 60) color = "#facc15";
-  if (percentage >= 80) color = "#ef4444";
+  if (percentage >= 41) color = "#facc15";
+  if (percentage >= 70) color = "#ef4444";
 
   return (
     <div className="w-full flex flex-col items-center mt-4">
@@ -211,11 +240,13 @@ export default function Home() {
     const averagePrice =
       Number(selectedFlight.averagePrice) || estimateAveragePrice(price);
 
-    const analysis = analyzeFare(
+    const safeProbability = getValidDropProbability(
+      selectedFlight,
       price,
-      averagePrice,
-      selectedFlight.dropProbability
+      averagePrice
     );
+
+    const analysis = analyzeFare(price, averagePrice, safeProbability);
 
     try {
       const response = await fetch(`${API_URL}/api/price-alerts`, {
@@ -397,11 +428,13 @@ export default function Home() {
             const averagePrice =
               Number(flight.averagePrice) || estimateAveragePrice(price);
 
-            const analysis = analyzeFare(
+            const safeProbability = getValidDropProbability(
+              flight,
               price,
-              averagePrice,
-              flight.dropProbability
+              averagePrice
             );
+
+            const analysis = analyzeFare(price, averagePrice, safeProbability);
 
             const routeOrigin = flight.origin || origin;
             const routeDestination = flight.destination || destination;
@@ -426,8 +459,10 @@ export default function Home() {
 
                     <div>
                       <p className="font-bold">
-                        {flight.departureTime || "08:30"} -{" "}
-                        {flight.arrivalTime || "10:34"}
+                        {flight.departureTime || flight.departure || "Horário não informado"}{" "}
+                        {flight.arrivalTime || flight.arrival
+                          ? `- ${flight.arrivalTime || flight.arrival}`
+                          : ""}
                       </p>
                       <p className="text-sm text-slate-600">
                         {routeOrigin}-{routeDestination}{" "}
