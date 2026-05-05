@@ -86,6 +86,32 @@ export default function Home() {
     return "🚀 Boa oportunidade para comprar";
   }
 
+  function gerarDecisao(voo, probabilidade) {
+    const preco = Number(voo.price || 0);
+
+    if (preco <= 120 || probabilidade <= 45) {
+      return {
+        texto: "🟢 COMPRE AGORA",
+        cor: "bg-green-500 text-white",
+        descricao: "Boa oportunidade para emitir agora.",
+      };
+    }
+
+    if (probabilidade >= 60) {
+      return {
+        texto: "🟡 ESPERE",
+        cor: "bg-yellow-400 text-black",
+        descricao: "Alta chance de o preço variar nos próximos dias.",
+      };
+    }
+
+    return {
+      texto: "🔴 PREÇO ALTO",
+      cor: "bg-red-500 text-white",
+      descricao: "Pode aparecer uma condição melhor depois.",
+    };
+  }
+
   function Gauge({ value }) {
     const safeValue = Math.min(Math.max(value, 0), 100);
 
@@ -258,9 +284,13 @@ export default function Home() {
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
           {resultados.map((voo) => {
             const prob = calcularProbabilidade(voo);
+            const decisao = gerarDecisao(voo, prob);
 
             return (
-              <div key={voo.id} className="bg-white rounded-xl shadow-md">
+              <div
+                key={voo.id}
+                className="bg-white rounded-xl shadow-md overflow-hidden"
+              >
                 <div className="bg-gray-100 px-6 py-5 flex justify-between">
                   <div>
                     <p className="font-semibold">
@@ -318,6 +348,16 @@ export default function Home() {
                 </div>
 
                 <div className="px-6 pb-6">
+                  <div
+                    className={`inline-block px-4 py-2 rounded-lg font-bold mb-2 ${decisao.cor}`}
+                  >
+                    {decisao.texto}
+                  </div>
+
+                  <p className="text-sm text-gray-500 mb-4">
+                    {decisao.descricao}
+                  </p>
+
                   <p className="text-3xl font-bold mb-2">
                     {converterParaBRL(voo.price)}
                   </p>
