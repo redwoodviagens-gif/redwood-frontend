@@ -35,9 +35,7 @@ export default function Home() {
 
       const response = await fetch(`${API_URL}/api/flights`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
 
@@ -64,7 +62,6 @@ export default function Home() {
 
   function converterParaBRL(valorUSD) {
     const valor = Number(valorUSD || 0) * DOLAR_FIXO;
-
     return valor.toLocaleString("pt-BR", {
       style: "currency",
       currency: "BRL",
@@ -73,7 +70,6 @@ export default function Home() {
 
   function calcularProbabilidade(voo) {
     const preco = Number(voo.price || 0);
-
     if (preco <= 120) return 83;
     if (preco <= 180) return 71;
     if (preco <= 250) return 58;
@@ -110,6 +106,10 @@ export default function Home() {
       cor: "bg-red-500 text-white",
       descricao: "Pode aparecer uma condição melhor depois.",
     };
+  }
+
+  function limparRecomendacao(texto) {
+    return texto.replace(/[🟢🟡🔴]/g, "").trim();
   }
 
   function Gauge({ value }) {
@@ -168,18 +168,10 @@ export default function Home() {
           />
 
           <nav className="hidden md:flex items-center gap-8 text-sm text-blue-100">
-            <a href="#" className="hover:text-yellow-400">
-              Passagens
-            </a>
-            <a href="#" className="hover:text-yellow-400">
-              Pacotes
-            </a>
-            <a href="#" className="hover:text-yellow-400">
-              Seguros
-            </a>
-            <a href="#" className="hover:text-yellow-400">
-              Atendimento
-            </a>
+            <a href="#" className="hover:text-yellow-400">Passagens</a>
+            <a href="#" className="hover:text-yellow-400">Pacotes</a>
+            <a href="#" className="hover:text-yellow-400">Seguros</a>
+            <a href="#" className="hover:text-yellow-400">Atendimento</a>
           </nav>
 
           <a
@@ -286,6 +278,28 @@ export default function Home() {
             const prob = calcularProbabilidade(voo);
             const decisao = gerarDecisao(voo, prob);
 
+            const mensagemReserva = encodeURIComponent(
+              `Olá! Vi uma passagem no site da Redwood Viagens:
+
+✈️ Trecho: ${voo.origin} → ${voo.destination}
+📅 Data: ${formatarData(dataIda)}
+💰 Valor encontrado: ${converterParaBRL(voo.price)}
+📊 Recomendação: ${limparRecomendacao(decisao.texto)}
+
+Pode me ajudar a confirmar disponibilidade e emitir?`
+            );
+
+            const mensagemAlerta = encodeURIComponent(
+              `Olá! Quero criar um alerta de preço na Redwood Viagens:
+
+✈️ Trecho: ${voo.origin} → ${voo.destination}
+📅 Data desejada: ${formatarData(dataIda)}
+💰 Valor atual: ${converterParaBRL(voo.price)}
+📊 Recomendação atual: ${limparRecomendacao(decisao.texto)}
+
+Pode me avisar quando esse preço baixar?`
+            );
+
             return (
               <div
                 key={voo.id}
@@ -372,82 +386,15 @@ export default function Home() {
 
                   <div className="mt-6 flex flex-wrap gap-3">
                     <a
-                      href={`https://wa.me/${WHATSAPP}?text=Quero reservar voo ${voo.origin} → ${voo.destination} por ${converterParaBRL(
-                        voo.price
-                      )}`}
+                      href={`https://wa.me/${WHATSAPP}?text=${mensagemReserva}`}
                       target="_blank"
                       className="bg-blue-600 text-white px-4 py-3 rounded font-bold"
                     >
-                     <a
-  href={`https://wa.me/${WHATSAPP}?text=${encodeURIComponent(
-    `Olá! Vi uma passagem no site da Redwood Viagens:
-
-✈️ Trecho: ${voo.origin} → ${voo.destination}
-📅 Data: ${formatarData(dataIda)}
-💰 Valor encontrado: ${converterParaBRL(voo.price)}
-📊 Recomendação: ${decisao.texto.replace(/[🟢🟡🔴]/g, "").trim()}
-
-Pode me ajudar a confirmar disponibilidade e emitir?`
-  )}`}
-  target="_blank"
-  className="bg-blue-600 text-white px-4 py-3 rounded font-bold"
->
-  Reservar
-</a>
-
-<a
-  href={`https://wa.me/${WHATSAPP}?text=${encodeURIComponent(
-    `Olá! Quero criar um alerta de preço na Redwood Viagens:
-
-✈️ Trecho: ${voo.origin} → ${voo.destination}
-📅 Data desejada: ${formatarData(dataIda)}
-💰 Valor atual: ${converterParaBRL(voo.price)}
-📊 Recomendação atual: ${decisao.texto.replace(/[🟢🟡🔴]/g, "").trim()}
-
-Pode me avisar quando esse preço baixar?`
-  )}`}
-  target="_blank"
-  style={{ backgroundColor: REDWOOD_RED }}
-  className="text-white px-4 py-3 rounded font-bold"
->
- <a
-  href={`https://wa.me/${WHATSAPP}?text=${encodeURIComponent(
-    `Olá! Vi uma passagem no site da Redwood Viagens:
-
-✈️ Trecho: ${voo.origin} → ${voo.destination}
-📅 Data: ${formatarData(dataIda)}
-💰 Valor encontrado: ${converterParaBRL(voo.price)}
-📊 Recomendação: ${decisao.texto.replace(/[🟢🟡🔴]/g, "").trim()}
-
-Pode me ajudar a confirmar disponibilidade e emitir?`
-  )}`}
-  target="_blank"
-  className="bg-blue-600 text-white px-4 py-3 rounded font-bold"
->
-  Reservar
-</a>
-
-<a
-  href={`https://wa.me/${WHATSAPP}?text=${encodeURIComponent(
-    `Olá! Quero criar um alerta de preço na Redwood Viagens:
-
-✈️ Trecho: ${voo.origin} → ${voo.destination}
-📅 Data desejada: ${formatarData(dataIda)}
-💰 Valor atual: ${converterParaBRL(voo.price)}
-📊 Recomendação atual: ${decisao.texto.replace(/[🟢🟡🔴]/g, "").trim()}
-
-Pode me avisar quando esse preço baixar?`
-  )}`}
-  target="_blank"
-  style={{ backgroundColor: REDWOOD_RED }}
-  className="text-white px-4 py-3 rounded font-bold"
->
-</a>
-</a>
+                      Reservar
                     </a>
 
                     <a
-                      href={`https://wa.me/${WHATSAPP}?text=Quero criar alerta de preço para voo ${voo.origin} → ${voo.destination}`}
+                      href={`https://wa.me/${WHATSAPP}?text=${mensagemAlerta}`}
                       target="_blank"
                       style={{ backgroundColor: REDWOOD_RED }}
                       className="text-white px-4 py-3 rounded font-bold"
