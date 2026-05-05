@@ -378,7 +378,72 @@ export default function Home() {
                       target="_blank"
                       className="bg-blue-600 text-white px-4 py-3 rounded font-bold"
                     >
-                      Reservar
+                     <a
+  href={`https://wa.me/${WHATSAPP}?text=${encodeURIComponent(
+    `Olá! Vi uma passagem no site da Redwood Viagens:
+
+✈️ Trecho: ${voo.origin} → ${voo.destination}
+📅 Data: ${formatarData(dataIda)}
+💰 Valor encontrado: ${converterParaBRL(voo.price)}
+📊 Recomendação: ${decisao.texto.replace(/[🟢🟡🔴]/g, "").trim()}
+
+Pode me ajudar a confirmar disponibilidade e emitir?`
+  )}`}
+  target="_blank"
+  className="bg-blue-600 text-white px-4 py-3 rounded font-bold"
+>
+  Reservar
+</a>
+
+<a
+  href={`https://wa.me/${WHATSAPP}?text=${encodeURIComponent(
+    `Olá! Quero criar um alerta de preço na Redwood Viagens:
+
+✈️ Trecho: ${voo.origin} → ${voo.destination}
+📅 Data desejada: ${formatarData(dataIda)}
+💰 Valor atual: ${converterParaBRL(voo.price)}
+📊 Recomendação atual: ${decisao.texto.replace(/[🟢🟡🔴]/g, "").trim()}
+
+Pode me avisar quando esse preço baixar?`
+  )}`}
+  target="_blank"
+  style={{ backgroundColor: REDWOOD_RED }}
+  className="text-white px-4 py-3 rounded font-bold"
+>
+ <a
+  href={`https://wa.me/${WHATSAPP}?text=${encodeURIComponent(
+    `Olá! Vi uma passagem no site da Redwood Viagens:
+
+✈️ Trecho: ${voo.origin} → ${voo.destination}
+📅 Data: ${formatarData(dataIda)}
+💰 Valor encontrado: ${converterParaBRL(voo.price)}
+📊 Recomendação: ${decisao.texto.replace(/[🟢🟡🔴]/g, "").trim()}
+
+Pode me ajudar a confirmar disponibilidade e emitir?`
+  )}`}
+  target="_blank"
+  className="bg-blue-600 text-white px-4 py-3 rounded font-bold"
+>
+  Reservar
+</a>
+
+<a
+  href={`https://wa.me/${WHATSAPP}?text=${encodeURIComponent(
+    `Olá! Quero criar um alerta de preço na Redwood Viagens:
+
+✈️ Trecho: ${voo.origin} → ${voo.destination}
+📅 Data desejada: ${formatarData(dataIda)}
+💰 Valor atual: ${converterParaBRL(voo.price)}
+📊 Recomendação atual: ${decisao.texto.replace(/[🟢🟡🔴]/g, "").trim()}
+
+Pode me avisar quando esse preço baixar?`
+  )}`}
+  target="_blank"
+  style={{ backgroundColor: REDWOOD_RED }}
+  className="text-white px-4 py-3 rounded font-bold"
+>
+</a>
+</a>
                     </a>
 
                     <a
