@@ -3,7 +3,7 @@
 import { useState } from "react";
 
 const API_URL =
-  process.env.NEXT_PUBLIC_API_URL ||
+const API_URL = "https://redwood-backend-production.up.railway.app";||
   "https://SEU-BACKEND-RAILWAY.up.railway.app";
 
 function formatMoney(value) {
