@@ -3,7 +3,6 @@
 import { useState } from "react";
 
 const API_URL = "https://redwood-backend-production.up.railway.app";
-  "https://SEU-BACKEND-RAILWAY.up.railway.app";
 
 function formatMoney(value) {
   if (!value && value !== 0) return "R$ --";
