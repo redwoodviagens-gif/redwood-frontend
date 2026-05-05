@@ -2,508 +2,493 @@
 
 import { useState } from "react";
 
-const API_URL = "https://redwood-backend-production.up.railway.app";
-const WHATSAPP = "55992290849";
-const REDWOOD_RED = "#e42320";
-const DOLAR_FIXO = 5.4;
+const API_URL =
+  process.env.NEXT_PUBLIC_API_URL || "https://SEU-BACKEND-RAILWAY.up.railway.app";
+
+function formatMoney(value) {
+  if (!value && value !== 0) return "R$ --";
+  return Number(value).toLocaleString("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+  });
+}
+
+function estimateAveragePrice(price) {
+  const current = Number(price || 0);
+
+  if (current <= 0) return 1000;
+
+  // Média estimada conservadora para comparação estatística inicial.
+  // Depois podemos trocar por histórico real da rota no banco.
+  return current * 1.45;
+}
+
+function analyzeFare(currentPrice, averagePrice, dropProbability) {
+  const price = Number(currentPrice || 0);
+  const avg = Number(averagePrice || estimateAveragePrice(price));
+  const probability = Math.max(0, Math.min(100, Number(dropProbability || 0)));
+
+  const priceIndex = price / avg;
+
+  let fareLevel = "";
+  let recommendation = "";
+  let message = "";
+  let badgeColor = "";
+  let buttonText = "";
+
+  if (priceIndex <= 0.75) {
+    fareLevel = "TARIFA BAIXA";
+  } else if (priceIndex <= 1.05) {
+    fareLevel = "TARIFA NORMAL";
+  } else if (priceIndex <= 1.25) {
+    fareLevel = "TARIFA ALTA";
+  } else {
+    fareLevel = "TARIFA MUITO ALTA";
+  }
+
+  if (priceIndex <= 0.75 && probability <= 40) {
+    recommendation = "COMPRE AGORA";
+    message =
+      "Tarifa abaixo da média e baixa chance de queda. Boa oportunidade para emitir agora.";
+    badgeColor = "bg-green-500";
+    buttonText = "Reservar";
+  } else if (priceIndex <= 0.75 && probability > 40) {
+    recommendation = "MONITORAR";
+    message =
+      "Tarifa boa, mas ainda existe chance relevante de queda. Vale criar um alerta.";
+    badgeColor = "bg-yellow-500";
+    buttonText = "Criar Alerta";
+  } else if (priceIndex <= 1.05 && probability >= 60) {
+    recommendation = "ESPERAR";
+    message =
+      "Preço dentro da média, mas com alta chance de queda. Melhor monitorar antes de comprar.";
+    badgeColor = "bg-yellow-500";
+    buttonText = "Criar Alerta";
+  } else if (priceIndex > 1.05 && probability >= 50) {
+    recommendation = "ESPERAR";
+    message =
+      "Tarifa acima da média e com chance de queda. Recomendamos aguardar ou criar alerta.";
+    badgeColor = "bg-orange-500";
+    buttonText = "Criar Alerta";
+  } else if (priceIndex > 1.25) {
+    recommendation = "PREÇO ALTO";
+    message =
+      "Tarifa muito acima da média. Recomendamos monitorar antes de emitir.";
+    badgeColor = "bg-red-600";
+    buttonText = "Monitorar Preço";
+  } else {
+    recommendation = "MONITORAR";
+    message =
+      "Preço aceitável, mas sem sinal forte para compra imediata. Crie um alerta.";
+    badgeColor = "bg-blue-600";
+    buttonText = "Criar Alerta";
+  }
+
+  return {
+    priceIndex,
+    fareLevel,
+    recommendation,
+    message,
+    dropProbability: probability,
+    averagePrice: avg,
+    badgeColor,
+    buttonText,
+  };
+}
+
+function ProbabilityGauge({ probability }) {
+  const percentage = Math.max(0, Math.min(100, probability || 0));
+  const rotation = (percentage / 100) * 180;
+
+  let color = "#22c55e";
+
+  if (percentage >= 60) color = "#facc15";
+  if (percentage >= 80) color = "#ef4444";
+
+  return (
+    <div className="w-full flex flex-col items-center mt-4">
+      <div className="relative w-44 h-24 overflow-hidden">
+        <div className="absolute inset-0 rounded-t-full border-[18px] border-gray-200 border-b-0"></div>
+
+        <div
+          className="absolute inset-0 rounded-t-full border-[18px] border-b-0"
+          style={{
+            borderColor: color,
+            borderBottomColor: "transparent",
+            transform: `rotate(${rotation - 180}deg)`,
+            transformOrigin: "center bottom",
+          }}
+        ></div>
+
+        <div className="absolute bottom-0 left-1/2 -translate-x-1/2 text-2xl font-bold">
+          {percentage}%
+        </div>
+      </div>
+
+      <div className="flex justify-between w-40 text-xs text-gray-400 mt-1">
+        <span>0</span>
+        <span>100</span>
+      </div>
+    </div>
+  );
+}
 
 export default function Home() {
-  const [origem, setOrigem] = useState("POA");
-  const [destino, setDestino] = useState("GIG");
-  const [dataIda, setDataIda] = useState("2026-06-12");
-  const [dataVolta, setDataVolta] = useState("2026-06-17");
-  const [adultos, setAdultos] = useState(1);
-  const [resultados, setResultados] = useState([]);
+  const [origin, setOrigin] = useState("POA");
+  const [destination, setDestination] = useState("GIG");
+  const [departureDate, setDepartureDate] = useState("2026-06-12");
+  const [returnDate, setReturnDate] = useState("");
+  const [passengers, setPassengers] = useState(1);
+
+  const [flights, setFlights] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [erro, setErro] = useState("");
+  const [selectedFlight, setSelectedFlight] = useState(null);
 
-  const [modalAberto, setModalAberto] = useState(false);
-  const [vooSelecionado, setVooSelecionado] = useState(null);
-  const [leadNome, setLeadNome] = useState("");
-  const [leadWhatsapp, setLeadWhatsapp] = useState("");
-  const [leadEmail, setLeadEmail] = useState("");
-  const [precoDesejado, setPrecoDesejado] = useState("");
+  const [lead, setLead] = useState({
+    name: "",
+    whatsapp: "",
+    email: "",
+    targetPrice: "",
+  });
 
-  async function buscarVoos(e) {
+  const [showModal, setShowModal] = useState(false);
+  const [alertLoading, setAlertLoading] = useState(false);
+
+  async function searchFlights(e) {
     e.preventDefault();
+    setLoading(true);
+    setFlights([]);
 
     try {
-      setLoading(true);
-      setErro("");
-      setResultados([]);
-
-      const payload = {
-        origin: origem.toUpperCase().trim(),
-        destination: destino.toUpperCase().trim(),
-        departureDate: dataIda,
-        returnDate: dataVolta || null,
-        adults: Number(adultos || 1),
-      };
-
       const response = await fetch(`${API_URL}/api/flights`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok || !data.success) {
-        throw new Error(data?.error || "Erro ao buscar voos");
-      }
-
-      setResultados(Array.isArray(data.flights) ? data.flights : []);
-    } catch (error) {
-      console.error(error);
-      setErro("Não foi possível buscar voos agora. Tente novamente.");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  function formatarData(data) {
-    if (!data) return "";
-    const [ano, mes, dia] = data.split("-");
-    return `${dia}/${mes}/${ano}`;
-  }
-
-  function converterParaBRL(valorUSD) {
-    const valor = Number(valorUSD || 0) * DOLAR_FIXO;
-
-    return valor.toLocaleString("pt-BR", {
-      style: "currency",
-      currency: "BRL",
-    });
-  }
-
-  function calcularPrecoBRLNumero(valorUSD) {
-    return Number((Number(valorUSD || 0) * DOLAR_FIXO).toFixed(2));
-  }
-
-  function calcularProbabilidade(voo) {
-    const preco = Number(voo.price || 0);
-
-    if (preco <= 120) return 83;
-    if (preco <= 180) return 65;
-    if (preco <= 250) return 48;
-    return 32;
-  }
-
-  function gerarDecisao(voo, probabilidade) {
-    const preco = Number(voo.price || 0);
-
-    if (preco <= 120) {
-      return {
-        tipo: "comprar",
-        texto: "🟢 COMPRE AGORA",
-        cor: "bg-green-500 text-white",
-        descricao: "Boa oportunidade para emitir agora.",
-        alerta: "✅ Boa oportunidade para comprar agora",
-        alertaCor: "bg-green-500",
-      };
-    }
-
-    if (probabilidade >= 60) {
-      return {
-        tipo: "esperar",
-        texto: "🟡 ESPERE",
-        cor: "bg-yellow-400 text-black",
-        descricao: "Existe chance de o preço cair nos próximos dias.",
-        alerta: "🔥 Espere, o preço pode cair",
-        alertaCor: "bg-cyan-400",
-      };
-    }
-
-    if (probabilidade >= 45) {
-      return {
-        tipo: "monitorar",
-        texto: "🟠 MONITORE",
-        cor: "bg-orange-500 text-white",
-        descricao: "Preço instável. Vale acompanhar antes de decidir.",
-        alerta: "⚠️ Fique atento, pode variar",
-        alertaCor: "bg-orange-500",
-      };
-    }
-
-    return {
-      tipo: "alto",
-      texto: "🔴 PREÇO ALTO",
-      cor: "bg-red-500 text-white",
-      descricao: "Pode aparecer uma condição melhor depois.",
-      alerta: "🚫 Preço alto, monitore antes de comprar",
-      alertaCor: "bg-red-500",
-    };
-  }
-
-  function limparRecomendacao(texto) {
-    return texto.replace(/[🟢🟡🟠🔴]/g, "").trim();
-  }
-
-  function abrirModalAlerta(voo, decisao) {
-    setVooSelecionado({ voo, decisao });
-    setLeadNome("");
-    setLeadWhatsapp("");
-    setLeadEmail("");
-    setPrecoDesejado("");
-    setModalAberto(true);
-  }
-
-  async function salvarAlertaComLead() {
-    try {
-      if (!vooSelecionado) return;
-
-      if (!leadNome || !leadWhatsapp) {
-        alert("Preencha nome e WhatsApp para criar o alerta.");
-        return;
-      }
-
-      const { voo, decisao } = vooSelecionado;
-
-      await fetch(`${API_URL}/api/price-alerts`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          nome: leadNome,
-          whatsapp: leadWhatsapp,
-          email: leadEmail,
-          origem: voo.origin,
-          destino: voo.destination,
-          dataIda: dataIda,
-          dataVolta: dataVolta,
-          passageiros: Number(adultos || 1),
-          precoAtual: calcularPrecoBRLNumero(voo.price),
-          moeda: "BRL",
-          precoDesejado: precoDesejado ? Number(precoDesejado) : null,
-          companhia: voo.airline || "",
-          codigoCompanhia: "",
-          horarioIda: voo.departureTime || "",
-          horarioVolta: voo.arrivalTime || "",
-          offerId: voo.id,
-          provider: "duffel",
-          observacoes: `Alerta criado pelo site Redwood Viagens. Recomendação: ${limparRecomendacao(
-            decisao.texto
-          )}`,
-          campanha: "site-redwood",
-          raw: voo,
+          origin,
+          destination,
+          departureDate,
+          returnDate,
+          passengers,
         }),
       });
 
-      const mensagemWhatsApp = encodeURIComponent(
-        `Olá! Quero criar um alerta de preço na Redwood Viagens:
+      const data = await response.json();
 
-👤 Nome: ${leadNome}
-📲 WhatsApp do cliente: ${leadWhatsapp}
-📧 Email: ${leadEmail || "Não informado"}
+      if (!response.ok) {
+        throw new Error(data?.message || "Erro ao buscar voos");
+      }
 
-✈️ Trecho: ${voo.origin} → ${voo.destination}
-📅 Ida: ${formatarData(dataIda)}
-📅 Volta: ${dataVolta ? formatarData(dataVolta) : "Não informada"}
-👥 Passageiros: ${adultos}
+      const normalizedFlights = Array.isArray(data.flights)
+        ? data.flights
+        : Array.isArray(data)
+        ? data
+        : [];
 
-💰 Valor atual: ${converterParaBRL(voo.price)}
-🎯 Preço desejado: ${precoDesejado ? `R$ ${precoDesejado}` : "Não informado"}
-📊 Recomendação atual: ${limparRecomendacao(decisao.texto)}
-
-Pode me avisar quando esse preço baixar?`
-      );
-
-      setModalAberto(false);
-
-      window.open(`https://wa.me/${WHATSAPP}?text=${mensagemWhatsApp}`, "_blank");
+      setFlights(normalizedFlights);
     } catch (error) {
-      console.error("Erro ao salvar alerta:", error);
-      alert("Não foi possível criar o alerta agora. Tente novamente.");
+      alert("Erro ao buscar voos. Verifique o backend e tente novamente.");
+      console.error(error);
+    } finally {
+      setLoading(false);
     }
   }
 
-  function Gauge({ value }) {
-    const safeValue = Math.min(Math.max(value, 0), 100);
+  function openAlertModal(flight) {
+    setSelectedFlight(flight);
+    setShowModal(true);
+  }
 
-    return (
-      <div className="w-48">
-        <svg viewBox="0 0 200 115" className="w-full h-auto">
-          <path
-            d="M 25 95 A 75 75 0 0 1 175 95"
-            fill="none"
-            stroke="#e5e7eb"
-            strokeWidth="24"
-            pathLength="100"
-          />
+  async function createPriceAlert(e) {
+    e.preventDefault();
 
-          <path
-            d="M 25 95 A 75 75 0 0 1 175 95"
-            fill="none"
-            stroke="#4ade00"
-            strokeWidth="24"
-            pathLength="100"
-            strokeDasharray={`${safeValue} 100`}
-          />
+    if (!selectedFlight) return;
 
-          <text
-            x="100"
-            y="88"
-            textAnchor="middle"
-            fontSize="22"
-            fontWeight="700"
-          >
-            {safeValue}%
-          </text>
+    setAlertLoading(true);
 
-          <text x="22" y="112" fontSize="11" fill="#9ca3af">
-            0
-          </text>
+    const price = Number(selectedFlight.price || selectedFlight.totalPrice || 0);
+    const averagePrice =
+      Number(selectedFlight.averagePrice) || estimateAveragePrice(price);
 
-          <text x="166" y="112" fontSize="11" fill="#9ca3af">
-            100
-          </text>
-        </svg>
-      </div>
+    const analysis = analyzeFare(
+      price,
+      averagePrice,
+      selectedFlight.dropProbability
     );
+
+    try {
+      const response = await fetch(`${API_URL}/api/price-alerts`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name: lead.name,
+          whatsapp: lead.whatsapp,
+          email: lead.email,
+          targetPrice: lead.targetPrice,
+          origin,
+          destination,
+          departureDate,
+          returnDate,
+          passengers,
+          currentPrice: price,
+          averagePrice: analysis.averagePrice,
+          dropProbability: analysis.dropProbability,
+          recommendation: analysis.recommendation,
+          fareLevel: analysis.fareLevel,
+          airline: selectedFlight.airline || selectedFlight.carrier || "",
+          departureTime: selectedFlight.departureTime || "",
+          arrivalTime: selectedFlight.arrivalTime || "",
+          stops: selectedFlight.stops ?? 0,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data?.message || "Erro ao criar alerta");
+      }
+
+      const whatsappMessage = encodeURIComponent(
+        `Olá! Tenho interesse nesse voo:\n\n` +
+          `✈️ ${origin} → ${destination}\n` +
+          `📅 Ida: ${departureDate}\n` +
+          `${returnDate ? `📅 Volta: ${returnDate}\n` : ""}` +
+          `👥 Passageiros: ${passengers}\n` +
+          `💰 Preço atual: ${formatMoney(price)}\n` +
+          `📊 Probabilidade de queda: ${analysis.dropProbability}%\n` +
+          `🧠 Recomendação: ${analysis.recommendation}\n\n` +
+          `Meu nome: ${lead.name}\n` +
+          `WhatsApp: ${lead.whatsapp}\n` +
+          `Preço desejado: ${formatMoney(lead.targetPrice)}`
+      );
+
+      window.open(`https://wa.me/55992290849?text=${whatsappMessage}`, "_blank");
+
+      setShowModal(false);
+      setLead({
+        name: "",
+        whatsapp: "",
+        email: "",
+        targetPrice: "",
+      });
+
+      alert("Alerta criado com sucesso!");
+    } catch (error) {
+      alert("Erro ao criar alerta. Verifique o backend.");
+      console.error(error);
+    } finally {
+      setAlertLoading(false);
+    }
   }
 
   return (
-    <main className="min-h-screen bg-[#031B34] text-white">
-      <header className="sticky top-0 z-50 bg-[#020F1F]/95 backdrop-blur border-b border-white/10">
-        <div className="max-w-7xl mx-auto px-6 lg:px-10 py-4 flex items-center justify-between">
-          <img
-            src="/logo-redwood.png"
-            alt="Redwood Viagens"
-            className="h-16 w-auto object-contain"
-          />
-
-          <nav className="hidden md:flex items-center gap-8 text-sm text-blue-100">
-            <a href="#" className="hover:text-yellow-400">
-              Passagens
-            </a>
-            <a href="#" className="hover:text-yellow-400">
-              Pacotes
-            </a>
-            <a href="#" className="hover:text-yellow-400">
-              Seguros
-            </a>
-            <a href="#" className="hover:text-yellow-400">
-              Atendimento
-            </a>
-          </nav>
+    <main className="min-h-screen bg-slate-50 text-slate-900">
+      <header className="bg-[#071426] text-white border-b border-red-600">
+        <div className="max-w-6xl mx-auto px-6 py-5 flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold tracking-wide">
+              Redwood Viagens
+            </h1>
+            <p className="text-sm text-slate-300">
+              Seu próximo destino começa com a melhor escolha.
+            </p>
+          </div>
 
           <a
-            href={`https://wa.me/${WHATSAPP}`}
+            href="https://wa.me/55992290849"
             target="_blank"
-            className="hidden md:inline-flex bg-[#e42320] text-white font-bold px-5 py-3 rounded-xl shadow-lg hover:opacity-90"
+            className="bg-red-600 hover:bg-red-700 px-5 py-3 rounded-xl font-bold"
           >
-            Falar com especialista
+            Fale no WhatsApp
           </a>
         </div>
       </header>
 
-      <section className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-12 px-6 lg:px-10 py-20 items-center">
-        <div>
-          <p className="text-yellow-400 tracking-[0.35em] text-xs mb-6">
-            REDWOOD VIAGENS
+      <section className="bg-gradient-to-br from-[#071426] to-[#0b2a4a] text-white">
+        <div className="max-w-6xl mx-auto px-6 py-14">
+          <h2 className="text-4xl font-extrabold max-w-3xl">
+            Pesquise passagens, compare preços e saiba se vale comprar agora.
+          </h2>
+          <p className="mt-4 text-slate-200 max-w-2xl">
+            Nosso sistema analisa preço, média estimada da rota e probabilidade
+            de queda para indicar a melhor decisão.
           </p>
-
-          <h1 className="text-5xl lg:text-7xl font-serif leading-tight">
-            Viaje com economia,{" "}
-            <span className="text-yellow-400 italic">segurança</span> e suporte
-            completo.
-          </h1>
-
-          <p className="mt-8 text-lg text-blue-100 max-w-xl">
-            Buscamos oportunidades reais, acompanhamos a variação dos preços e
-            conectamos você com atendimento humano para decidir com segurança.
-          </p>
-
-          <div className="mt-8 flex flex-wrap gap-4 text-sm text-blue-100">
-            <span>🛡️ Compra segura</span>
-            <span>🎧 Suporte humano</span>
-            <span>✈️ Passagens e pacotes</span>
-          </div>
         </div>
+      </section>
 
+      <section className="max-w-6xl mx-auto px-6 -mt-8">
         <form
-          onSubmit={buscarVoos}
-          className="bg-[#020F1F] border border-yellow-500/40 rounded-3xl p-8 shadow-2xl"
+          onSubmit={searchFlights}
+          className="bg-white shadow-xl rounded-2xl p-6 grid grid-cols-1 md:grid-cols-6 gap-4"
         >
-          <p className="text-yellow-400 tracking-[0.35em] text-xs mb-4">
-            BUSCA INTELIGENTE
-          </p>
-
-          <h2 className="text-3xl font-bold mb-6">Pesquisar passagem</h2>
-
-          <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="text-sm font-semibold">Origem</label>
             <input
-              value={origem}
-              onChange={(e) => setOrigem(e.target.value)}
-              placeholder="Origem"
-              className="p-4 text-black rounded-xl font-bold"
-            />
-
-            <input
-              value={destino}
-              onChange={(e) => setDestino(e.target.value)}
-              placeholder="Destino"
-              className="p-4 text-black rounded-xl font-bold"
-            />
-
-            <input
-              type="date"
-              value={dataIda}
-              onChange={(e) => setDataIda(e.target.value)}
-              className="p-4 text-black rounded-xl font-bold"
-            />
-
-            <input
-              type="date"
-              value={dataVolta}
-              onChange={(e) => setDataVolta(e.target.value)}
-              className="p-4 text-black rounded-xl font-bold"
+              value={origin}
+              onChange={(e) => setOrigin(e.target.value.toUpperCase())}
+              className="w-full mt-1 border rounded-xl px-3 py-3"
+              placeholder="POA"
             />
           </div>
 
-          <input
-            type="number"
-            min="1"
-            value={adultos}
-            onChange={(e) => setAdultos(e.target.value)}
-            className="mt-4 p-4 w-full text-black rounded-xl font-bold"
-          />
+          <div>
+            <label className="text-sm font-semibold">Destino</label>
+            <input
+              value={destination}
+              onChange={(e) => setDestination(e.target.value.toUpperCase())}
+              className="w-full mt-1 border rounded-xl px-3 py-3"
+              placeholder="GIG"
+            />
+          </div>
 
-          <button className="mt-6 w-full bg-yellow-400 text-black p-4 rounded-xl font-bold hover:bg-yellow-300">
-            {loading ? "Buscando..." : "🔎 Buscar melhores preços"}
+          <div>
+            <label className="text-sm font-semibold">Ida</label>
+            <input
+              type="date"
+              value={departureDate}
+              onChange={(e) => setDepartureDate(e.target.value)}
+              className="w-full mt-1 border rounded-xl px-3 py-3"
+            />
+          </div>
+
+          <div>
+            <label className="text-sm font-semibold">Volta</label>
+            <input
+              type="date"
+              value={returnDate}
+              onChange={(e) => setReturnDate(e.target.value)}
+              className="w-full mt-1 border rounded-xl px-3 py-3"
+            />
+          </div>
+
+          <div>
+            <label className="text-sm font-semibold">Pessoas</label>
+            <input
+              type="number"
+              min="1"
+              value={passengers}
+              onChange={(e) => setPassengers(e.target.value)}
+              className="w-full mt-1 border rounded-xl px-3 py-3"
+            />
+          </div>
+
+          <button
+            type="submit"
+            className="bg-red-600 hover:bg-red-700 text-white rounded-xl font-bold mt-6 py-3"
+          >
+            {loading ? "Buscando..." : "Buscar"}
           </button>
-
-          {erro && <p className="text-red-400 mt-3">{erro}</p>}
         </form>
       </section>
 
-      <section className="bg-[#f3f6f9] text-black px-6 lg:px-24 py-12">
-        <h2 className="text-3xl font-bold mb-8">Voos encontrados</h2>
-
-        {resultados.length === 0 && !loading && (
-          <div className="bg-white border rounded-xl p-8 text-gray-600">
-            Faça uma busca para visualizar as oportunidades disponíveis.
+      <section className="max-w-6xl mx-auto px-6 py-10">
+        {flights.length === 0 && !loading && (
+          <div className="text-center text-slate-500 py-10">
+            Faça uma busca para ver as melhores opções.
           </div>
         )}
 
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-          {resultados.map((voo) => {
-            const prob = calcularProbabilidade(voo);
-            const decisao = gerarDecisao(voo, prob);
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {flights.map((flight, index) => {
+            const price = Number(flight.price || flight.totalPrice || 0);
+            const averagePrice =
+              Number(flight.averagePrice) || estimateAveragePrice(price);
 
-            const mensagemReserva = encodeURIComponent(
-              `Olá! Vi uma passagem no site da Redwood Viagens:
-
-✈️ Trecho: ${voo.origin} → ${voo.destination}
-📅 Data: ${formatarData(dataIda)}
-💰 Valor encontrado: ${converterParaBRL(voo.price)}
-📊 Recomendação: ${limparRecomendacao(decisao.texto)}
-
-Pode me ajudar a confirmar disponibilidade e emitir?`
+            const analysis = analyzeFare(
+              price,
+              averagePrice,
+              flight.dropProbability
             );
+
+            const routeOrigin = flight.origin || origin;
+            const routeDestination = flight.destination || destination;
 
             return (
               <div
-                key={voo.id}
-                className="bg-white rounded-xl shadow-md overflow-hidden"
+                key={flight.id || index}
+                className="bg-white rounded-2xl shadow-lg overflow-hidden border border-slate-100"
               >
-                <div className="bg-gray-100 px-6 py-5 flex justify-between">
-                  <div>
-                    <p className="font-semibold">
-                      {voo.origin} → {voo.destination}
-                    </p>
-                    <p className="text-sm text-gray-500">
-                      {formatarData(dataIda)}
-                    </p>
-                  </div>
+                <div className="bg-slate-100 px-6 py-4">
+                  <h3 className="font-bold">
+                    {routeOrigin} → {routeDestination}
+                  </h3>
+                  <p className="text-sm text-slate-500">{departureDate}</p>
                 </div>
 
-                <div className="px-6 py-5 flex items-center gap-4">
-                  <div className="w-20 h-12 flex items-center justify-center">
-                    {voo.airlineLogo ? (
-                      <img
-                        src={voo.airlineLogo}
-                        alt={voo.airline || "Companhia aérea"}
-                        className="max-h-full max-w-full object-contain"
-                      />
-                    ) : (
-                      <span className="text-sm font-bold">
-                        {voo.airline || "Cia"}
-                      </span>
-                    )}
+                <div className="p-6">
+                  <div className="flex items-center gap-4 mb-4">
+                    <div className="w-14 h-14 rounded-xl bg-slate-100 flex items-center justify-center text-xl">
+                      ✈️
+                    </div>
+
+                    <div>
+                      <p className="font-bold">
+                        {flight.departureTime || "08:30"} -{" "}
+                        {flight.arrivalTime || "10:34"}
+                      </p>
+                      <p className="text-sm text-slate-600">
+                        {routeOrigin}-{routeDestination}{" "}
+                        {Number(flight.stops || 0) === 0
+                          ? "Direto"
+                          : `${flight.stops} parada(s)`}
+                      </p>
+                    </div>
                   </div>
 
-                  <div>
-                    <p className="font-bold">
-                      {voo.departureTime
-                        ? new Date(voo.departureTime).toLocaleTimeString(
-                            "pt-BR",
-                            {
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            }
-                          )
-                        : "--:--"}
-                      {" - "}
-                      {voo.arrivalTime
-                        ? new Date(voo.arrivalTime).toLocaleTimeString(
-                            "pt-BR",
-                            {
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            }
-                          )
-                        : "--:--"}
-                    </p>
-
-                    <p>
-                      {voo.origin}-{voo.destination}{" "}
-                      {voo.stops === 0 ? "Direto" : `${voo.stops} escala(s)`}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="px-6 pb-6">
-                  <div
-                    className={`inline-block px-4 py-2 rounded-lg font-bold mb-2 ${decisao.cor}`}
+                  <span
+                    className={`${analysis.badgeColor} inline-block text-white font-bold px-4 py-2 rounded-lg text-sm`}
                   >
-                    {decisao.texto}
-                  </div>
+                    {analysis.recommendation}
+                  </span>
 
-                  <p className="text-sm text-gray-500 mb-4">
-                    {decisao.descricao}
+                  <p className="text-sm text-slate-600 mt-3">
+                    {analysis.message}
                   </p>
 
-                  <p className="text-3xl font-bold mb-2">
-                    {converterParaBRL(voo.price)}
-                  </p>
+                  <div className="mt-5">
+                    <p className="text-3xl font-extrabold">
+                      {formatMoney(price)}
+                    </p>
 
-                  <div
-                    className={`${decisao.alertaCor} text-white px-4 py-2 rounded inline-block`}
-                  >
-                    {decisao.alerta}
+                    <p className="text-xs text-slate-500 mt-1">
+                      Média estimada da rota:{" "}
+                      <strong>{formatMoney(analysis.averagePrice)}</strong>
+                    </p>
+
+                    <p className="text-xs text-slate-500">
+                      Índice da tarifa:{" "}
+                      <strong>{analysis.priceIndex.toFixed(2)}</strong>
+                    </p>
                   </div>
 
-                  <p className="mt-5 font-bold">Probabilidade de descida</p>
+                  <div
+                    className={`${analysis.badgeColor} text-white font-semibold rounded-lg px-4 py-3 mt-4 text-sm`}
+                  >
+                    {analysis.fareLevel} — {analysis.message}
+                  </div>
 
-                  <Gauge value={prob} />
+                  <h4 className="font-bold mt-6">
+                    Probabilidade de descida
+                  </h4>
 
-                  <div className="mt-6 flex flex-wrap gap-3">
-                    <a
-                      href={`https://wa.me/${WHATSAPP}?text=${mensagemReserva}`}
-                      target="_blank"
-                      className="bg-blue-600 text-white px-4 py-3 rounded font-bold"
+                  <ProbabilityGauge probability={analysis.dropProbability} />
+
+                  <div className="flex gap-3 mt-6">
+                    <button
+                      onClick={() => openAlertModal(flight)}
+                      className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg"
                     >
-                      Reservar
-                    </a>
+                      {analysis.buttonText}
+                    </button>
 
                     <button
-                      onClick={() => abrirModalAlerta(voo, decisao)}
-                      style={{ backgroundColor: REDWOOD_RED }}
-                      className="text-white px-4 py-3 rounded font-bold"
+                      onClick={() => openAlertModal(flight)}
+                      className="flex-1 bg-red-600 hover:bg-red-700 text-white font-bold py-3 rounded-lg"
                     >
-                      🔔 Criar Alerta de Preço
+                      🔔 Alerta
                     </button>
                   </div>
                 </div>
@@ -513,62 +498,69 @@ Pode me ajudar a confirmar disponibilidade e emitir?`
         </div>
       </section>
 
-      {modalAberto && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[999] px-4">
-          <div className="bg-white text-black p-6 rounded-2xl w-full max-w-md shadow-2xl">
-            <h2 className="text-2xl font-bold mb-2 text-[#031B34]">
-              Criar alerta de preço
-            </h2>
-
-            <p className="text-sm text-gray-600 mb-5">
-              Preencha seus dados para a Redwood avisar quando aparecer uma
-              melhor oportunidade.
+      {showModal && selectedFlight && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
+          <div className="bg-white rounded-2xl p-6 max-w-md w-full">
+            <h3 className="text-xl font-bold">Criar alerta de preço</h3>
+            <p className="text-sm text-slate-600 mt-1">
+              Informe seus dados para monitorarmos essa tarifa.
             </p>
 
-            <input
-              placeholder="Seu nome"
-              value={leadNome}
-              onChange={(e) => setLeadNome(e.target.value)}
-              className="w-full p-3 border rounded-xl mb-3"
-            />
+            <form onSubmit={createPriceAlert} className="mt-5 space-y-4">
+              <input
+                placeholder="Nome"
+                value={lead.name}
+                onChange={(e) => setLead({ ...lead, name: e.target.value })}
+                className="w-full border rounded-xl px-4 py-3"
+                required
+              />
 
-            <input
-              placeholder="WhatsApp com DDD"
-              value={leadWhatsapp}
-              onChange={(e) => setLeadWhatsapp(e.target.value)}
-              className="w-full p-3 border rounded-xl mb-3"
-            />
+              <input
+                placeholder="WhatsApp"
+                value={lead.whatsapp}
+                onChange={(e) =>
+                  setLead({ ...lead, whatsapp: e.target.value })
+                }
+                className="w-full border rounded-xl px-4 py-3"
+                required
+              />
 
-            <input
-              placeholder="Email (opcional)"
-              value={leadEmail}
-              onChange={(e) => setLeadEmail(e.target.value)}
-              className="w-full p-3 border rounded-xl mb-3"
-            />
+              <input
+                type="email"
+                placeholder="E-mail"
+                value={lead.email}
+                onChange={(e) => setLead({ ...lead, email: e.target.value })}
+                className="w-full border rounded-xl px-4 py-3"
+              />
 
-            <input
-              placeholder="Preço desejado em R$ (opcional)"
-              value={precoDesejado}
-              onChange={(e) => setPrecoDesejado(e.target.value)}
-              className="w-full p-3 border rounded-xl mb-5"
-            />
+              <input
+                type="number"
+                placeholder="Preço desejado"
+                value={lead.targetPrice}
+                onChange={(e) =>
+                  setLead({ ...lead, targetPrice: e.target.value })
+                }
+                className="w-full border rounded-xl px-4 py-3"
+              />
 
-            <div className="flex gap-3">
-              <button
-                onClick={salvarAlertaComLead}
-                style={{ backgroundColor: REDWOOD_RED }}
-                className="text-white px-4 py-3 rounded-xl font-bold w-full"
-              >
-                Salvar alerta
-              </button>
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowModal(false)}
+                  className="flex-1 border rounded-xl py-3 font-bold"
+                >
+                  Cancelar
+                </button>
 
-              <button
-                onClick={() => setModalAberto(false)}
-                className="bg-gray-200 px-4 py-3 rounded-xl font-bold w-full"
-              >
-                Cancelar
-              </button>
-            </div>
+                <button
+                  type="submit"
+                  disabled={alertLoading}
+                  className="flex-1 bg-red-600 text-white rounded-xl py-3 font-bold"
+                >
+                  {alertLoading ? "Salvando..." : "Criar alerta"}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
